@@ -32,7 +32,11 @@ export function makeDeadLetterHandler(deadQueue: Queue) {
       attempts: job.attemptsMade,
       lastError: err?.message ?? String(err),
     };
-    await deadQueue.add(job.name, { ...job.data, failureContext }, { jobId: job.id });
+    // Let the dead-letter queue auto-assign the job id. BullMQ rejects a custom
+    // jobId that parses as an integer ("Custom Ids cannot be integers"), and the
+    // main queue's auto ids are exactly that. Keep the origin id in the data for
+    // tracing instead of forcing it as the DLQ job id.
+    await deadQueue.add(job.name, { ...job.data, failureContext, originalJobId: job.id });
   };
 }
 
