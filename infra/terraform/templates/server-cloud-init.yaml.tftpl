@@ -1,0 +1,45 @@
+#cloud-config
+package_update: true
+packages:
+  - git
+  - curl
+
+write_files:
+  - path: /etc/anvil/server.env
+    permissions: "0600"
+    content: |
+      REDIS_URL=${redis_url}
+      WEBHOOK_SECRET=${webhook_secret}
+      PORT=${port}
+
+  - path: /etc/systemd/system/anvil-server.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Anvil webhook server
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      EnvironmentFile=/etc/anvil/server.env
+      WorkingDirectory=/opt/anvil
+      ExecStart=/usr/bin/node /opt/anvil/apps/server/dist/index.js
+      Restart=always
+      RestartSec=3
+      User=anvil
+      Group=anvil
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+  - npm install -g pnpm@9
+  - useradd --system --create-home --shell /usr/sbin/nologin anvil || true
+  - git clone https://github.com/ykstorm/anvil.git /opt/anvil
+  - bash -lc 'cd /opt/anvil && pnpm install --frozen-lockfile && pnpm -r build'
+  - chown -R anvil:anvil /opt/anvil
+  - systemctl daemon-reload
+  - systemctl enable --now anvil-server

@@ -1,0 +1,95 @@
+# Default values for the Anvil chart.
+# Anvil is a webhook server + queue worker backed by Redis. This chart deploys
+# all three. There is no database; Redis is the only datastore.
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Container image shared by the server and the worker. The repo does not publish
+# an image yet, so point this at your own build of apps/server and apps/worker.
+# The two are selected by the command each Deployment runs.
+image:
+  repository: ghcr.io/ykstorm/anvil
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# The HMAC secret the server verifies signatures against (WEBHOOK_SECRET).
+secret:
+  # When create is true, the chart renders a Secret from webhookSecret below.
+  # When false, set existingSecret to the name of a Secret you manage; it must
+  # carry the key under existingSecretKey.
+  create: true
+  webhookSecret: "whsec_changeme"
+  existingSecret: ""
+  existingSecretKey: "webhook-secret"
+
+server:
+  replicas: 1
+  port: 3000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    enabled: true
+    className: ""
+    annotations: {}
+    host: anvil.example.com
+    # Path the webhook server serves. Matches apps/server.
+    path: /webhooks
+    pathType: Prefix
+    tls: []
+
+worker:
+  # Number of worker pods draining the queue. Mirror this to Terraform's
+  # worker_count when you run both.
+  replicas: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# Redis deployed inside the cluster. Self-contained so the chart needs no
+# subchart. For production move to a managed or replicated Redis and set
+# redis.deploy to false, then point redis.url at it.
+redis:
+  deploy: true
+  image:
+    repository: redis
+    tag: "7.4.1"
+    pullPolicy: IfNotPresent
+  port: 6379
+  # Used only when redis.deploy is false. Otherwise the chart builds the URL
+  # from the in-cluster Redis service.
+  url: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
+# Applied to every pod.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL

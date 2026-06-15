@@ -1,0 +1,19 @@
+{{- if .Values.redis.deploy }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "anvil.redisFullname" . }}
+  labels:
+    {{- include "anvil.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "anvil.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+  ports:
+    - name: redis
+      port: {{ .Values.redis.port }}
+      targetPort: redis
+      protocol: TCP
+{{- end }}

@@ -84,6 +84,28 @@ These five behaviours have tests. Each is the reason a line of code exists.
 See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the request flow and the
 other docs for the reasoning behind each contract.
 
+## Deploy
+
+Two ways to stand up the pipeline (server + worker + Redis). Both are 0.x
+scaffolds and provision only what Anvil uses; there is no database.
+
+- **Hetzner Cloud (Terraform):** [infra/terraform/](./infra/terraform/) brings
+  up a Redis VM, the webhook server, and a worker pool whose size is set by
+  `worker_count`. Hetzner has no managed Redis, so the module runs Redis on a
+  VM via cloud-init; the README there explains the trade.
+- **Kubernetes (Helm):** [charts/anvil/](./charts/anvil/) deploys the server
+  (Deployment + Service + Ingress on `/webhooks`), the worker (replicas =
+  `worker.replicas`), and an in-cluster Redis. `REDIS_URL` and the
+  `WEBHOOK_SECRET` are wired in for you.
+
+```bash
+# Terraform
+terraform -chdir=infra/terraform init && terraform -chdir=infra/terraform apply
+
+# Helm
+helm install anvil ./charts/anvil --set secret.webhookSecret=whsec_real
+```
+
 ## Known limitations
 
 This is 0.1. It is honest about what it is not yet.

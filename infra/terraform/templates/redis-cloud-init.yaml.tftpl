@@ -1,0 +1,23 @@
+#cloud-config
+package_update: true
+packages:
+  - redis-server
+
+write_files:
+  - path: /etc/redis/redis.conf
+    owner: redis:redis
+    permissions: "0640"
+    content: |
+      # Managed by Terraform (Anvil infra). Do not edit by hand.
+      bind 127.0.0.1 ${redis_bind_ip}
+      protected-mode yes
+      port 6379
+      maxmemory ${maxmemory_mb}mb
+      maxmemory-policy noeviction
+      appendonly yes
+      appendfsync everysec
+      dir /var/lib/redis
+
+runcmd:
+  - systemctl enable redis-server
+  - systemctl restart redis-server
