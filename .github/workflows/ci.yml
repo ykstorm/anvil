@@ -57,7 +57,15 @@ jobs:
           terraform_wrapper: false
 
       - name: Terraform init
-        run: terraform -chdir=infra/terraform init -backend=false
+        # registry.terraform.io rate-limits (429) anonymous provider downloads
+        # under load. Retry with backoff so a throttle doesn't fail the job.
+        run: |
+          for i in 1 2 3 4 5; do
+            terraform -chdir=infra/terraform init -backend=false && exit 0
+            echo "init attempt $i failed (registry.terraform.io may be throttling); retrying in $((i*15))s"
+            sleep $((i*15))
+          done
+          echo "terraform init failed after 5 attempts"; exit 1
 
       - name: Terraform validate
         run: terraform -chdir=infra/terraform validate
