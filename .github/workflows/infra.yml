@@ -1,0 +1,62 @@
+name: Infra
+
+# Terraform + Helm validation. Runs only when the infra or chart sources change
+# (not on every push) — it depends on registry.terraform.io for provider
+# schemas, which rate-limits anonymous downloads, so scoping it keeps the
+# default CI fast and green.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/terraform/**'
+      - 'charts/anvil/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/terraform/**'
+      - 'charts/anvil/**'
+
+jobs:
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+
+      - name: Terraform init
+        # registry.terraform.io rate-limits (429) anonymous provider downloads
+        # under load. Retry with backoff so a throttle doesn't fail the job.
+        run: |
+          for i in 1 2 3 4 5; do
+            terraform -chdir=infra/terraform init -backend=false && exit 0
+            echo "init attempt $i failed (registry.terraform.io may be throttling); retrying in $((i*20))s"
+            sleep $((i*20))
+          done
+          echo "terraform init failed after 5 attempts"; exit 1
+
+      - name: Terraform validate
+        run: terraform -chdir=infra/terraform validate
+
+      - name: Terraform fmt
+        run: terraform -chdir=infra/terraform fmt -check -recursive
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSL -o kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf kubeconform.tar.gz kubeconform
+          sudo install kubeconform /usr/local/bin/kubeconform
+
+      - name: Helm lint
+        run: helm lint charts/anvil
+
+      - name: Helm template + kubeconform
+        run: helm template charts/anvil | kubeconform -strict -summary -ignore-missing-schemas
