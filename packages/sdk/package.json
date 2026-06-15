@@ -1,9 +1,36 @@
 {
   "name": "@ykstormsorg/anvil",
   "version": "0.1.0",
-  "description": "SDK for the Anvil idempotent webhook to BullMQ worker pipeline.",
+  "description": "Idempotent webhook to BullMQ worker pipeline — HMAC-SHA256 verify, dedupe, retry/backoff, dead-letter replay.",
+  "keywords": [
+    "webhook",
+    "bullmq",
+    "redis",
+    "idempotency",
+    "hmac",
+    "dead-letter",
+    "queue",
+    "retry",
+    "worker",
+    "stripe"
+  ],
   "license": "MIT",
-  "author": "Lakshyaraj Singh Rao",
+  "author": "Lakshyaraj Singh Rao <raolakshyaraj@gmail.com>",
+  "homepage": "https://github.com/ykstorm/anvil#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ykstorm/anvil.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": "https://github.com/ykstorm/anvil/issues",
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
