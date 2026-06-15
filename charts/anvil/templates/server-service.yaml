@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "anvil.fullname" . }}-server
+  labels:
+    {{- include "anvil.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  type: {{ .Values.server.service.type }}
+  selector:
+    {{- include "anvil.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  ports:
+    - name: http
+      port: {{ .Values.server.service.port }}
+      targetPort: http
+      protocol: TCP

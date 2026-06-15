@@ -6,3 +6,10 @@ coverage/
 .env
 .env.local
 *.tsbuildinfo
+
+# Terraform working files (the provider lock file IS committed)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
