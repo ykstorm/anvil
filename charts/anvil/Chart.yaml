@@ -1,0 +1,16 @@
+apiVersion: v2
+name: anvil
+description: Idempotent webhook to BullMQ worker pipeline (server + worker + Redis).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/ykstorm/anvil
+sources:
+  - https://github.com/ykstorm/anvil
+keywords:
+  - webhook
+  - bullmq
+  - redis
+  - queue
+maintainers:
+  - name: ykstorm
