@@ -21,8 +21,8 @@ importers:
   apps/server:
     dependencies:
       bullmq:
-        specifier: ^5.34.5
-        version: 5.78.1
+        specifier: ^5.79.0
+        version: 5.79.0
       express:
         specifier: ^4.21.2
         version: 4.22.2
@@ -43,8 +43,8 @@ importers:
   apps/worker:
     dependencies:
       bullmq:
-        specifier: ^5.34.5
-        version: 5.78.1
+        specifier: ^5.79.0
+        version: 5.79.0
       ioredis:
         specifier: 5.11.1
         version: 5.11.1
@@ -59,8 +59,8 @@ importers:
   packages/sdk:
     dependencies:
       bullmq:
-        specifier: ^5.34.5
-        version: 5.78.1
+        specifier: ^5.79.0
+        version: 5.79.0
       express:
         specifier: ^4.21.2
         version: 4.22.2
@@ -470,8 +470,8 @@ packages:
     resolution: {integrity: sha512-3grm+/2tUOvu2cjJkvsIxrv/wVpfXQW4PsQHYm7yk4vfpu7Ekl6nEsYBoJUL6qDwZUx8wUhQ8tR2qz+ad9c9OA==}
     engines: {node: '>= 0.8', npm: 1.2.8000 || >= 1.4.16}
 
-  bullmq@5.78.1:
-    resolution: {integrity: sha512-zD5IT+qMqbMgPFPdL9FwnZka1bz6nckM+5lXj4N0vsXqdzoVO6wizmXpwsg/4GnHmXJsL7XOKeWA64tYUdPrOA==}
+  bullmq@5.79.0:
+    resolution: {integrity: sha512-sg+kYGn7PIDI/AAkSWINPNz0vMp745YaBYMyo3AtcfXk5iCvjEPU+XMbU3yf7rSf1KsU+OfU+GH8FhxUa+WDNA==}
     engines: {node: '>=12.22.0'}
     peerDependencies:
       redis: '>=5.0.0'
@@ -1292,7 +1292,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  bullmq@5.78.1:
+  bullmq@5.79.0:
     dependencies:
       cron-parser: 4.9.0
       ioredis: 5.11.1
