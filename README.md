@@ -27,7 +27,10 @@ Replay of dead jobs is a separate, manual step so a broken handler cannot loop.
 
 ## Quickstart
 
-You need Node 20+ and a Redis instance. Local Redis in one line:
+Install the SDK in your app with `npm install @ykstormsorg/anvil` — published
+with [SLSA build provenance](https://slsa.dev/), which npm verifies on install.
+To run this repo (worker + server + examples) from source you need Node 20+ and
+a Redis instance. Local Redis in one line:
 
 ```bash
 docker run -p 6379:6379 redis:7
@@ -115,8 +118,6 @@ helm install anvil ./charts/anvil --set secret.webhookSecret=whsec_real
 
 This is 0.1. It is honest about what it is not yet.
 
-- Not published to npm. Install from source for now.
-- Only the Stripe example is written. A GitHub example is planned but not built.
 - The replay path is single-job and manual. There is no batch-replay tool and
   no UI.
 - Assumes one Redis and one region. Multi-region delivery and cross-region
@@ -127,9 +128,7 @@ This is 0.1. It is honest about what it is not yet.
 ## Roadmap
 
 - A `replayDeadLetter` batch mode and a small CLI.
-- The GitHub webhook example.
 - An optional timestamp-tolerance check in the server middleware.
-- Publish `@ykstormsorg/anvil` to npm once the surface settles.
 
 ## License
 

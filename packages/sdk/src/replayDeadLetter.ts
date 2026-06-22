@@ -1,46 +1,28 @@
-import { Queue } from "bullmq";
-import IORedis from "ioredis";
+import { replayDeadLetter as replayInternal } from "./internal/deadLetter.js";
+import type { ReplayResult } from "./internal/deadLetter.js";
 
 export interface ReplayOptions {
   redisUrl?: string;
   mainQueueName?: string;
 }
 
-export interface ReplayResult {
-  replayed: boolean;
-  jobId: string;
-}
+export type { ReplayResult };
 
 /**
  * Move a single dead-lettered job back onto the main queue. This is a separate
  * consumer from the worker on purpose: replaying is a manual, gated action so a
  * broken handler cannot put failures into an endless auto-retry loop. Importing
  * this module starts no worker.
+ *
+ * Delegates to ./internal/deadLetter — the single source of truth shared with
+ * apps/worker.
  */
 export async function replayDeadLetter(
   jobId: string,
   opts: ReplayOptions = {},
 ): Promise<ReplayResult> {
-  const redisUrl = opts.redisUrl ?? process.env.REDIS_URL ?? "redis://localhost:6379";
-  const mainName = opts.mainQueueName ?? "webhooks";
-
-  const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null, lazyConnect: true });
-  const mainQueue = new Queue(mainName, { connection });
-  const deadQueue = new Queue(`${mainName}.dead`, { connection });
-
-  try {
-    const dead = await deadQueue.getJob(jobId);
-    if (!dead) {
-      return { replayed: false, jobId };
-    }
-    const { failureContext, ...payload } = dead.data as Record<string, unknown>;
-    void failureContext;
-    const revived = await mainQueue.add(dead.name, payload);
-    await dead.remove();
-    return { replayed: true, jobId: revived.id ?? jobId };
-  } finally {
-    await mainQueue.close();
-    await deadQueue.close();
-    await connection.quit();
-  }
+  return replayInternal(jobId, {
+    redisUrl: opts.redisUrl,
+    mainQueueName: opts.mainQueueName,
+  });
 }
