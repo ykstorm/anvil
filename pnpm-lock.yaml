@@ -20,6 +20,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@ykstormsorg/anvil':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       bullmq:
         specifier: ^5.34.5
         version: 5.78.1
@@ -42,6 +45,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@ykstormsorg/anvil':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       bullmq:
         specifier: ^5.34.5
         version: 5.78.1
