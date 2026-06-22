@@ -1,7 +1,9 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import express, { type Express, type Request, type Response } from "express";
 import { Queue } from "bullmq";
 import IORedis from "ioredis";
+import { verify } from "./internal/verify.js";
+import { computeIdempotencyKey } from "./internal/idempotency.js";
+import { enqueueWebhook } from "./internal/enqueue.js";
 
 export interface ServerOptions {
   secret: string;
@@ -10,27 +12,12 @@ export interface ServerOptions {
   signatureHeader?: string;
 }
 
-function verify(body: Buffer, signatureHeader: string, secret: string): boolean {
-  if (typeof signatureHeader !== "string" || !signatureHeader.startsWith("sha256=")) {
-    return false;
-  }
-  const provided = signatureHeader.slice("sha256=".length);
-  if (!/^[0-9a-f]+$/i.test(provided)) return false;
-
-  const expected = createHmac("sha256", secret).update(body).digest("hex");
-  const a = Buffer.from(provided, "hex");
-  const b = Buffer.from(expected, "hex");
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
-
-function idempotencyKey(signatureHeader: string, raw: Buffer): string {
-  return createHash("sha256").update(signatureHeader, "utf8").update(raw).digest("hex");
-}
-
 /**
  * Build the Anvil webhook ingress app. Verifies the HMAC over the raw body,
  * dedupes by sha256(signature + payload), enqueues to BullMQ, returns 202.
+ *
+ * The crypto (constant-time verify), idempotency key, and enqueue de-dupe are
+ * imported from ./internal — the single source of truth shared with apps/server.
  */
 export function createServer(opts: ServerOptions): Express {
   const {
@@ -57,18 +44,13 @@ export function createServer(opts: ServerOptions): Express {
         return;
       }
 
-      const key = idempotencyKey(sig, raw);
-      const existing = await queue.getJob(key);
-      if (existing) {
-        res.status(202).json({ jobId: existing.id, replayed: true });
-        return;
-      }
-      const job = await queue.add(
-        "webhook",
-        { body: raw.toString("utf8"), sig },
-        { jobId: key, removeOnComplete: false, removeOnFail: false },
-      );
-      res.status(202).json({ jobId: job.id, replayed: false });
+      const key = computeIdempotencyKey(sig, raw);
+      const result = await enqueueWebhook(queue, key, {
+        body: raw.toString("utf8"),
+        sig,
+      });
+
+      res.status(202).json(result);
     },
   );
 

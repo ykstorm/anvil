@@ -9,13 +9,17 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint ."
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
+    "@eslint/js": "^9",
+    "eslint": "^9",
     "typescript": "^5.6.3",
+    "typescript-eslint": "^8",
     "vitest": "^2.1.8"
   },
   "pnpm": {

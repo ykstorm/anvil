@@ -1,9 +1,7 @@
 import { Queue, Worker, type Job } from "bullmq";
 import IORedis from "ioredis";
-
-export const BACKOFF_MS: readonly number[] = [1000, 5000, 30000, 300000];
-export const MAX_ATTEMPTS = BACKOFF_MS.length;
-export const DEAD_QUEUE_NAME = "webhooks.dead";
+import { backoffStrategy, MAX_ATTEMPTS } from "./internal/retry.js";
+import { DEAD_QUEUE_NAME, makeDeadLetterHandler } from "./internal/deadLetter.js";
 
 export interface WebhookJobData {
   body: string;
@@ -23,16 +21,13 @@ export interface RunningWorker {
   close: () => Promise<void>;
 }
 
-function backoffStrategy(attemptsMade: number): number {
-  const idx = attemptsMade - 1;
-  if (idx < 0 || idx >= BACKOFF_MS.length) return 0;
-  return BACKOFF_MS[idx]!;
-}
-
 /**
  * Build a worker that runs `handler`, retries on the backoff schedule, and
  * dead-letters to webhooks.dead after MAX_ATTEMPTS. The dead queue is written
  * to but never consumed here; replay is a separate process.
+ *
+ * The backoff schedule and dead-letter handler are imported from ./internal —
+ * the single source of truth shared with apps/worker.
  */
 export function createWorker(
   handler: WebhookHandler,
@@ -46,6 +41,7 @@ export function createWorker(
 
   const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null, lazyConnect: true });
   const deadQueue = new Queue(DEAD_QUEUE_NAME, { connection });
+  const onDead = makeDeadLetterHandler(deadQueue);
 
   let worker: Worker | null = null;
 
@@ -58,17 +54,7 @@ export function createWorker(
       });
       worker.on("failed", async (job, err) => {
         if (job && job.attemptsMade >= MAX_ATTEMPTS) {
-          await deadQueue.add(
-            job.name,
-            {
-              ...job.data,
-              failureContext: {
-                attempts: job.attemptsMade,
-                lastError: err?.message ?? String(err),
-              },
-            },
-            { jobId: job.id },
-          );
+          await onDead(job, err);
         }
       });
     },
