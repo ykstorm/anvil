@@ -1,4 +1,5 @@
 import type { Queue } from "bullmq";
+import { RETRY_JOB_OPTIONS } from "./retry.js";
 
 export interface WebhookJobData {
   body: string;
@@ -36,6 +37,9 @@ export async function enqueueWebhook(
     jobId: idempotencyKey,
     removeOnComplete: false,
     removeOnFail: false,
+    // Carry the retry schedule so a failing handler retries on the backoff
+    // and dead-letters after MAX_ATTEMPTS, instead of failing exactly once.
+    ...RETRY_JOB_OPTIONS,
   });
 
   // A race can still let two concurrent adds resolve; BullMQ keeps only the

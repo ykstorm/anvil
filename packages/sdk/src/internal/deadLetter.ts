@@ -1,6 +1,7 @@
 import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import type { Job } from "bullmq";
+import { RETRY_JOB_OPTIONS } from "./retry.js";
 
 export const DEAD_QUEUE_NAME = "webhooks.dead";
 
@@ -91,7 +92,10 @@ export async function replayDeadLetter(
 
     const { failureContext, ...payload } = dead.data as DeadJobData;
     void failureContext; // dropped on replay; the retry counter resets
-    const revived = await mainQueue.add(dead.name, payload);
+    // Replay with the full retry schedule: a replayed job that fails again must
+    // follow the same [1s,5s,30s,5m] backoff and dead-letter after MAX_ATTEMPTS,
+    // not fail once and bounce straight back to the dead-letter queue.
+    const revived = await mainQueue.add(dead.name, payload, { ...RETRY_JOB_OPTIONS });
     await dead.remove();
 
     return { replayed: true, jobId: revived.id ?? jobId };

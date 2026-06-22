@@ -8,6 +8,7 @@
 export {
   BACKOFF_MS,
   MAX_ATTEMPTS,
+  RETRY_JOB_OPTIONS,
   backoffDelay,
   backoffStrategy,
 } from "@ykstormsorg/anvil/internal/retry";

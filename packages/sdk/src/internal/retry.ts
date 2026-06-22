@@ -13,6 +13,17 @@ export const BACKOFF_MS: readonly number[] = [1000, 5000, 30000, 300000];
 export const MAX_ATTEMPTS = BACKOFF_MS.length;
 
 /**
+ * Per-job retry options every main-queue job must carry to follow the backoff
+ * schedule: MAX_ATTEMPTS attempts driven by the custom backoff strategy. Apply
+ * these on enqueue AND on replay, otherwise a job gets a single attempt and
+ * either never retries or dead-letters immediately.
+ */
+export const RETRY_JOB_OPTIONS = {
+  attempts: MAX_ATTEMPTS,
+  backoff: { type: "custom" as const },
+};
+
+/**
  * Delay before the retry for a given attempt number (1-based, matching
  * BullMQ's attemptsMade at the point of the backoff decision). Returns 0 once
  * the schedule is exhausted, signalling no further retry.
