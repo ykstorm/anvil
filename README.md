@@ -65,6 +65,19 @@ You get back `202 { "jobId": "...", "replayed": false }`. Send the same request
 again and `replayed` is `true` with the same `jobId`; the worker still runs the
 job once.
 
+## Docker
+
+Local dev — Redis, server, and worker in one command:
+
+```bash
+docker compose up --build
+```
+
+The server listens on `:3000`. Both app images are multi-stage
+`node:20-alpine` builds that run as a non-root user; see
+[apps/server/Dockerfile](./apps/server/Dockerfile) and
+[apps/worker/Dockerfile](./apps/worker/Dockerfile).
+
 ## Contracts
 
 These five behaviours have tests. Each is the reason a line of code exists.
