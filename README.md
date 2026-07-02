@@ -5,7 +5,7 @@
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
-Idempotent webhook to BullMQ worker pipeline.
+> Idempotent webhook to BullMQ worker pipeline. HMAC-SHA256, fixed-schedule retry, dead-letter replay.
 
 Anvil is the piece between a provider's webhook and your business logic. It
 verifies the signature, drops duplicates, puts one job on a queue, and returns
@@ -65,6 +65,19 @@ You get back `202 { "jobId": "...", "replayed": false }`. Send the same request
 again and `replayed` is `true` with the same `jobId`; the worker still runs the
 job once.
 
+## Docker
+
+Local dev — Redis, server, and worker in one command:
+
+```bash
+docker compose up --build
+```
+
+The server listens on `:3000`. Both app images are multi-stage
+`node:20-alpine` builds that run as a non-root user; see
+[apps/server/Dockerfile](./apps/server/Dockerfile) and
+[apps/worker/Dockerfile](./apps/worker/Dockerfile).
+
 ## Contracts
 
 These five behaviours have tests. Each is the reason a line of code exists.
@@ -102,11 +115,20 @@ payload:
 |---|---|
 | Per-verify cost | **~4.2 µs** (~238k verifies/sec) |
 | Valid vs same-length **wrong** signature | **0.8% timing delta** |
+| Ingress throughput | **~8.8k req/s** (verify → dedupe → enqueue, in-memory queue) |
+| Ingress latency p50 / p99 | **5 ms / 13 ms** |
 
 A sub-1% delta between a valid signature and a same-length forgery is the
 evidence behind the constant-time claim — `timingSafeEqual` plus the
 length-guard means there is no timing or length oracle for an attacker to grind
 against. Reproduce with `node bench/verify.mjs` (Node 24, pure CPU, no Redis).
+
+Ingress throughput is measured over the real verify → idempotency →
+dedupe-enqueue path with an in-memory queue mock (no Redis, no worker), so it
+isolates Anvil's own cost rather than Redis'. Full percentiles and the
+dedupe/reject breakdown are in [bench/report-latest.md](./bench/report-latest.md);
+methodology in [bench/README.md](./bench/README.md). Reproduce with
+`node bench/throughput.mjs`.
 
 ## Deploy
 

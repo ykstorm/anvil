@@ -1,0 +1,8 @@
+# Never ship these into the build context.
+.git
+**/node_modules
+**/dist
+**/coverage
+.env
+.env.*
+**/*.log
