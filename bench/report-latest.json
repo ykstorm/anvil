@@ -1,0 +1,24 @@
+{
+  "node": "v24.14.0",
+  "duration_s": 10,
+  "connections": 50,
+  "unique_payloads": 200,
+  "throughput_rps": 8791,
+  "latency_ms": {
+    "p50": 5,
+    "p90": 7,
+    "p97_5": 11,
+    "p99": 13,
+    "p99_9": 20,
+    "max": 306
+  },
+  "requests_total": 87950,
+  "accepted_202": 200,
+  "replayed_dedupe": 83550,
+  "rejected_401": 4200,
+  "non2xx": 4200,
+  "dedupe_rate_pct": 95,
+  "reject_rate_pct": 4.8,
+  "retry_rate_pct": null,
+  "dead_letter_rate_pct": null
+}

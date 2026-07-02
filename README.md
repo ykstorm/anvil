@@ -115,11 +115,20 @@ payload:
 |---|---|
 | Per-verify cost | **~4.2 µs** (~238k verifies/sec) |
 | Valid vs same-length **wrong** signature | **0.8% timing delta** |
+| Ingress throughput | **~8.8k req/s** (verify → dedupe → enqueue, in-memory queue) |
+| Ingress latency p50 / p99 | **5 ms / 13 ms** |
 
 A sub-1% delta between a valid signature and a same-length forgery is the
 evidence behind the constant-time claim — `timingSafeEqual` plus the
 length-guard means there is no timing or length oracle for an attacker to grind
 against. Reproduce with `node bench/verify.mjs` (Node 24, pure CPU, no Redis).
+
+Ingress throughput is measured over the real verify → idempotency →
+dedupe-enqueue path with an in-memory queue mock (no Redis, no worker), so it
+isolates Anvil's own cost rather than Redis'. Full percentiles and the
+dedupe/reject breakdown are in [bench/report-latest.md](./bench/report-latest.md);
+methodology in [bench/README.md](./bench/README.md). Reproduce with
+`node bench/throughput.mjs`.
 
 ## Deploy
 
