@@ -5,7 +5,7 @@
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
-Idempotent webhook to BullMQ worker pipeline.
+> Idempotent webhook to BullMQ worker pipeline. HMAC-SHA256, fixed-schedule retry, dead-letter replay.
 
 Anvil is the piece between a provider's webhook and your business logic. It
 verifies the signature, drops duplicates, puts one job on a queue, and returns
