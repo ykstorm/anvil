@@ -8,7 +8,9 @@ on:
     branches: [main]
 
 jobs:
-  build-test:
+  # Full pipeline incl. integration tests. Redis is a Linux-only service
+  # container, so the tests that need a queue live here.
+  test:
     runs-on: ubuntu-latest
 
     strategy:
@@ -18,7 +20,7 @@ jobs:
 
     services:
       redis:
-        image: redis:7
+        image: redis:7-alpine
         ports:
           - 6379:6379
         options: >-
@@ -52,10 +54,42 @@ jobs:
 
       - run: pnpm -r test
 
+  # Cross-OS build/type/lint. No Redis (service containers are Linux-only),
+  # so no integration tests here — this guards against path-separator and
+  # ESM-resolution breakage on Windows/macOS.
+  cross-os:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+        node: [20, 22]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm -r build
+
+      - run: pnpm -r typecheck
+
+      - run: pnpm -r lint
+
   publish:
     name: Publish @ykstormsorg/anvil to npm
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-test]
+    needs: [test, cross-os]
     runs-on: ubuntu-latest
     permissions:
       contents: read
