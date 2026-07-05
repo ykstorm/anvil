@@ -108,15 +108,17 @@ other docs for the reasoning behind each contract.
 ## Performance
 
 Signature verification runs on every inbound webhook, and "constant-time"
-should mean what it says. Measured over 500k verifications of a ~340-byte
-payload:
+should mean what it says. Measured in CI (GitHub Actions `ubuntu-latest`,
+Node 20) — the numbers below are produced by
+[`.github/workflows/benchmark.yml`](.github/workflows/benchmark.yml) on every
+push, over 500k verifications of a ~340-byte payload:
 
 | Metric | Result |
 |---|---|
-| Per-verify cost | **~4.2 µs** (~238k verifies/sec) |
-| Valid vs same-length **wrong** signature | **0.8% timing delta** |
-| Ingress throughput | **~8.8k req/s** (verify → dedupe → enqueue, in-memory queue) |
-| Ingress latency p50 / p99 | **5 ms / 13 ms** |
+| Per-verify cost | **~3.3 µs** (~305k verifies/sec) |
+| Valid vs same-length **wrong** signature | **0.9% timing delta** |
+| Ingress throughput | **~10.5k req/s** (verify → dedupe → enqueue, in-memory queue) |
+| Ingress latency p50 / p99 | **4 ms / 8 ms** |
 
 A sub-1% delta between a valid signature and a same-length forgery is the
 evidence behind the constant-time claim — `timingSafeEqual` plus the
