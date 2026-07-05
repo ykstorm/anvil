@@ -1,0 +1,28 @@
+name: Benchmark
+on:
+  push:
+    branches: [main]
+    paths: ['bench/**', 'packages/**', 'apps/**', '.github/workflows/benchmark.yml']
+  pull_request:
+    paths: ['bench/**', 'packages/**', 'apps/**']
+  workflow_dispatch:
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - name: HMAC verify benchmark (pure CPU)
+        run: node bench/verify.mjs | tee bench/hmac.txt
+      - name: Ingress throughput benchmark (in-memory queue, no Redis)
+        run: node bench/throughput.mjs | tee bench/throughput.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: anvil-bench
+          path: bench/*.txt
