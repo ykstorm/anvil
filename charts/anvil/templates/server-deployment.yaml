@@ -17,6 +17,8 @@ spec:
         {{- include "anvil.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: server
     spec:
+      # Anvil talks to Redis, never the Kubernetes API — do not mount a token.
+      automountServiceAccountToken: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
