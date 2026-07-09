@@ -18,6 +18,8 @@ spec:
         {{- include "anvil.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: redis
     spec:
+      # Redis serves the queue only — it has no need for a Kubernetes API token.
+      automountServiceAccountToken: false
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       volumes:
