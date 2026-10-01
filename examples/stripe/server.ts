@@ -18,10 +18,7 @@ if (!secret) {
 // format (it carries a timestamp and v1 signature) before handing it over. For
 // this example we use Anvil's default `x-signature` header to keep the focus on
 // the pipeline rather than Stripe's header parsing.
-const app = createServer({
-  secret,
-  queueName: "webhooks",
-});
+const app = createServer({ secret });
 
 const port = Number(process.env.PORT ?? 3000);
 app.listen(port, () => {

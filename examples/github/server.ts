@@ -2,7 +2,7 @@
  * Example: a GitHub webhook ingress built on Anvil. Example code, not
  * production config.
  *
- * GitHub signs every delivery with `X-Hub-Signature-256: sha256=<hex>` — exactly
+ * GitHub signs every delivery with `X-Hub-Signature-256: sha256=<hex>`, exactly
  * the format Anvil's `verify` expects, so this wires up with no header
  * adaptation (unlike the Stripe example, whose `t=,v1=` header needs
  * reformatting first). Just point `signatureHeader` at it.
@@ -19,7 +19,6 @@ if (!secret) {
 
 const app = createServer({
   secret,
-  queueName: "webhooks",
   signatureHeader: "x-hub-signature-256",
 });
 

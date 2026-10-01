@@ -23,7 +23,6 @@ const worker = createWorker(
         console.log("ignoring", event.type);
     }
   },
-  { queueName: "webhooks" },
 );
 
 await worker.start();
