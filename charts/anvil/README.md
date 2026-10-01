@@ -10,7 +10,7 @@ Redis is the only datastore.
 | --- | --- | --- |
 | Server | Deployment + Service + Ingress | Runs `apps/server`. Verifies HMAC, dedupes, enqueues, returns 202. Ingress exposes `POST /webhooks`. Liveness/readiness on `/healthz`. |
 | Worker | Deployment | Runs `apps/worker`. `worker.replicas` pods drain the BullMQ queue. No ingress. |
-| Redis | Deployment + Service | In-cluster Redis 7 with `appendonly` and `noeviction`. Toggle with `redis.deploy`. |
+| Redis | Deployment + Service + NetworkPolicy | In-cluster Redis 7 with `appendonly` and `noeviction`. A NetworkPolicy limits ingress on 6379 to the server and worker pods. Optional `requirepass` via `redis.password`. Toggle with `redis.deploy`. |
 | Secret | Secret | Holds `WEBHOOK_SECRET`. Create here or reference an existing one. |
 
 The server and worker both get `REDIS_URL` pointing at the Redis Service. The
@@ -18,11 +18,12 @@ server gets `WEBHOOK_SECRET` from the Secret via `secretKeyRef`.
 
 ## Image
 
-The repo does not publish a container image yet. Set `image.repository` and
-`image.tag` to your own build that contains the built `apps/server` and
-`apps/worker`. The server and worker pods select which app to run through the
-container `command` (`node apps/server/dist/index.js` and
-`node apps/worker/dist/index.js`).
+The repo does not publish a container image. `image.repository` has no default
+and must be set; the chart fails to render without it. Build
+`apps/server/Dockerfile` and `apps/worker/Dockerfile` (each image runs
+`node dist/index.js`) and push them. The two are separate builds, so set
+`server.image.repository` and `worker.image.repository` when they differ;
+otherwise both fall back to `image.repository`.
 
 ## Install
 
@@ -56,10 +57,12 @@ helm install anvil ./charts/anvil \
 
 See `values.yaml`. Common ones:
 
-- `worker.replicas` — number of worker pods. Mirror to Terraform `worker_count`.
-- `server.ingress.host` / `server.ingress.path` — webhook ingress address.
-- `secret.create` / `secret.webhookSecret` / `secret.existingSecret`.
+- `worker.replicas`, number of worker pods. Mirror to Terraform `worker_count`.
+- `server.ingress.host` / `server.ingress.path`, webhook ingress address.
+- `secret.create` / `secret.webhookSecret` / `secret.existingSecret`. The chart
+  refuses to render the placeholder `whsec_changeme` or an empty secret.
 - `redis.deploy` / `redis.url`.
+- `redis.password` / `redis.existingSecret` for Redis `requirepass`.
 
 ## Validation
 

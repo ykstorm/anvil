@@ -5,11 +5,13 @@
 nameOverride: ""
 fullnameOverride: ""
 
-# Container image shared by the server and the worker. The repo does not publish
-# an image yet, so point this at your own build of apps/server and apps/worker.
-# The two are selected by the command each Deployment runs.
+# Container image. The repo publishes no image, so image.repository has no
+# default and must be set: build apps/server/Dockerfile and apps/worker/Dockerfile
+# and push them. The server and worker are separate builds (each runs
+# `node dist/index.js`), so set server.image.repository and worker.image.repository
+# when they differ; otherwise both fall back to image.repository.
 image:
-  repository: ghcr.io/ykstorm/anvil
+  repository: ""
   tag: "0.1.0"
   pullPolicy: IfNotPresent
 
@@ -18,16 +20,20 @@ imagePullSecrets: []
 # The HMAC secret the server verifies signatures against (WEBHOOK_SECRET).
 secret:
   # When create is true, the chart renders a Secret from webhookSecret below.
-  # When false, set existingSecret to the name of a Secret you manage; it must
-  # carry the key under existingSecretKey.
+  # webhookSecret must be set to a real value; the chart refuses to render the
+  # placeholder. When false, set existingSecret to a Secret you manage carrying
+  # the key under existingSecretKey.
   create: true
-  webhookSecret: "whsec_changeme"
+  webhookSecret: ""
   existingSecret: ""
   existingSecretKey: "webhook-secret"
 
 server:
   replicas: 1
   port: 3000
+  # Optional per-component image repository; falls back to image.repository.
+  image:
+    repository: ""
   resources:
     requests:
       cpu: 50m
@@ -54,6 +60,9 @@ worker:
   # Number of worker pods draining the queue. Mirror this to Terraform's
   # worker_count when you run both.
   replicas: 2
+  # Optional per-component image repository; falls back to image.repository.
+  image:
+    repository: ""
   resources:
     requests:
       cpu: 50m
@@ -77,11 +86,17 @@ redis:
   # Used only when redis.deploy is false. Otherwise the chart builds the URL
   # from the in-cluster Redis service.
   url: ""
+  # Redis auth (requirepass). Set password, or point existingSecret at a Secret
+  # you manage carrying the password under existingSecretKey. When either is set
+  # the in-cluster Redis enforces requirepass and REDIS_URL carries the password.
+  password: ""
+  existingSecret: ""
+  existingSecretKey: "redis-password"
   resources:
     requests:
       cpu: 50m
       memory: 64Mi
-      # Redis AOF persists to an emptyDir under /data — reserve room for it.
+      # Redis AOF persists to an emptyDir under /data, reserve room for it.
       ephemeral-storage: 256Mi
     limits:
       cpu: 250m

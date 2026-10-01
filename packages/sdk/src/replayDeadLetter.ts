@@ -14,8 +14,7 @@ export type { ReplayResult };
  * broken handler cannot put failures into an endless auto-retry loop. Importing
  * this module starts no worker.
  *
- * Delegates to ./internal/deadLetter — the single source of truth shared with
- * apps/worker.
+ * Delegates to ./internal/deadLetter.
  */
 export async function replayDeadLetter(
   jobId: string,

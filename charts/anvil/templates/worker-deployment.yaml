@@ -17,7 +17,7 @@ spec:
         {{- include "anvil.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: worker
     spec:
-      # Anvil talks to Redis, never the Kubernetes API — do not mount a token.
+      # Anvil talks to Redis, never the Kubernetes API, so do not mount a token.
       automountServiceAccountToken: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -27,10 +27,17 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: worker
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: {{ include "anvil.image" (list . .Values.worker.image.repository) | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["node", "apps/worker/dist/index.js"]
+          command: ["node", "dist/index.js"]
           env:
+            {{- if include "anvil.redisAuthEnabled" . }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "anvil.redisSecretName" . }}
+                  key: {{ include "anvil.redisSecretKey" . }}
+            {{- end }}
             - name: REDIS_URL
               value: {{ include "anvil.redisUrl" . | quote }}
           resources:

@@ -46,4 +46,19 @@ export default tseslint.config(
       "@typescript-eslint/no-non-null-assertion": "off",
     },
   },
+  {
+    // Plain-JS bench scripts run under Node and use its globals. They are not
+    // TypeScript, so declare the globals they rely on for no-undef.
+    files: ["**/*.mjs"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        URL: "readonly",
+      },
+    },
+  },
 );

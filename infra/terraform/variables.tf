@@ -15,6 +15,18 @@ variable "ssh_public_key" {
   type        = string
 }
 
+variable "ssh_allowed_cidrs" {
+  description = "CIDRs allowed to reach SSH (port 22). Empty by default, which creates no SSH ingress rule at all. Set it to your operator IPs, for example [\"203.0.113.4/32\"]."
+  type        = list(string)
+  default     = []
+}
+
+variable "anvil_git_ref" {
+  description = "Git ref (branch, tag, or commit) the app VMs check out when they build from source at boot."
+  type        = string
+  default     = "main"
+}
+
 variable "location" {
   description = "Hetzner location for the servers (for example nbg1, fsn1, hel1, ash)."
   type        = string
@@ -65,6 +77,13 @@ variable "redis_maxmemory_mb" {
   default     = 2048
 }
 
+variable "redis_password" {
+  description = "Password for Redis (requirepass). When set it is enforced on the Redis VM and folded into REDIS_URL for the app VMs. Empty disables auth; set a value for anything beyond a throwaway stack. Pass it from a secret store, do not commit it."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 # --- App: server ---
 
 variable "server_server_type" {
@@ -79,11 +98,11 @@ variable "server_port" {
   default     = 3000
 }
 
-variable "webhook_secret" {
-  description = "HMAC secret the server verifies signatures against (WEBHOOK_SECRET). Provide a real value at apply time; do not commit it."
-  type        = string
-  sensitive   = true
-}
+# WEBHOOK_SECRET is deliberately NOT a Terraform variable. cloud-init user_data
+# is readable from the instance metadata service and the provider console, so a
+# secret templated into it is effectively exposed. The server reads
+# WEBHOOK_SECRET from /etc/anvil/server.env, which the operator writes after the
+# VM boots (over SSH or a config-management step). See the module README.
 
 # --- App: worker pool ---
 

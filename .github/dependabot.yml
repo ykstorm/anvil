@@ -21,3 +21,19 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+  - package-ecosystem: "docker"
+    directories:
+      - "/apps/server"
+      - "/apps/worker"
+    schedule:
+      interval: "weekly"
+    groups:
+      docker:
+        patterns: ["*"]
+  - package-ecosystem: "terraform"
+    directory: "/infra/terraform"
+    schedule:
+      interval: "weekly"
+    groups:
+      terraform:
+        patterns: ["*"]

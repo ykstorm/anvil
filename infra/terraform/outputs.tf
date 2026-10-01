@@ -14,8 +14,9 @@ output "redis_private_ip" {
 }
 
 output "redis_url" {
-  description = "Internal REDIS_URL handed to the app VMs."
+  description = "Internal REDIS_URL handed to the app VMs. Carries the Redis password when one is set."
   value       = local.redis_url
+  sensitive   = true
 }
 
 output "worker_private_ips" {

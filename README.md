@@ -7,29 +7,64 @@
 
 > Idempotent webhook to BullMQ worker pipeline. HMAC-SHA256, fixed-schedule retry, dead-letter replay.
 
-Anvil is the piece between a provider's webhook and your business logic. It
-verifies the signature, drops duplicates, puts one job on a queue, and returns
-202 fast. A worker processes the job in the background with a fixed retry
-schedule and a dead-letter queue for jobs that never succeed.
+## The problem
 
-## What it does
+A provider sends you a webhook. You have to check it is genuine, make sure you
+do not process the same delivery twice, and get your slow business logic off the
+request path so the sender does not time out. Then the hard parts: the delivery
+retries, your handler crashes mid-job, the provider re-sends the same event, and
+a few jobs never succeed and need somewhere to go.
 
-A webhook arrives over HTTP. Anvil:
+Anvil is the piece between the provider and your business logic. It verifies the
+signature, drops duplicates, puts one job on a queue, and returns 202 fast. A
+worker runs your handler in the background on a fixed retry schedule, and a
+dead-letter queue holds whatever never succeeds. Replay of a dead job is a
+separate, manual step so a broken handler cannot loop.
 
-1. verifies the HMAC-SHA256 signature over the raw body, in constant time;
-2. computes an idempotency key from the signature and the payload bytes;
-3. enqueues exactly one BullMQ job per key, even under re-delivery;
-4. returns 202 with the job id;
-5. runs your handler in a worker, retrying on backoff and dead-lettering after
-   the schedule is spent.
+## The five contracts
 
-Replay of dead jobs is a separate, manual step so a broken handler cannot loop.
+Each of these has a test, and each is the reason a line of code exists.
+
+- **One job per delivery.** The idempotency key is `sha256(signature header +
+  raw body)`. The first delivery claims the key with an atomic
+  `SET key 1 NX EX <ttl>` and enqueues one job; later deliveries of the same key
+  find it already set and return `replayed: true` without enqueuing again. Two
+  concurrent copies of the same delivery still yield exactly one job. The key
+  expires after the dedupe TTL (one week by default), which bounds the memory.
+- **Constant-time signature check.** `verify(body, sigHeader, secret)` recomputes
+  the HMAC-SHA256 over the raw bytes and compares with `crypto.timingSafeEqual`
+  after a length check, so the compare never throws and leaks no length oracle.
+  An empty secret, a malformed header, or a length mismatch is a plain `false`.
+- **Fixed retry backoff.** A failing handler retries on `[1s, 5s, 30s, 5m]`.
+  After the fourth failure the job moves to `webhooks.dead` with
+  `failureContext: { attempts, lastError }`, where `lastError` is truncated and
+  has credential-looking query params redacted.
+- **Replay is a separate consumer.** `replayDeadLetter(jobId)` moves a dead job
+  back to the main queue with a fresh retry schedule and returns
+  `{ replayed: true }`. The replay path starts no worker on the main queue, so
+  importing it cannot kick off a retry loop.
+- **Small SDK surface.** `@ykstormsorg/anvil` exports exactly `createServer`,
+  `createWorker`, and `replayDeadLetter`.
+
+See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the request flow and the
+other docs for the reasoning behind each contract.
 
 ## Quickstart
 
-Install the SDK in your app with `npm install @ykstormsorg/anvil` — published
-with [SLSA build provenance](https://slsa.dev/), which npm verifies on install.
-To run this repo (worker + server + examples) from source you need Node 20+ and
+Install the SDK in your app:
+
+```bash
+npm install @ykstormsorg/anvil
+```
+
+The publish job builds with provenance (`pnpm publish --provenance`). npm does
+not check provenance at install time, so verify it yourself after installing:
+
+```bash
+npm audit signatures
+```
+
+To run this repo (server + worker + examples) from source you need Node 20+ and
 a Redis instance. Local Redis in one line:
 
 ```bash
@@ -46,7 +81,7 @@ pnpm -r build
 REDIS_URL=redis://localhost:6379 pnpm --filter @anvil/worker start
 
 # terminal 2: the server
-WEBHOOK_SECRET=whsec_dev REDIS_URL=redis://localhost:6379 \
+WEBHOOK_SECRET=whsec_dev_secret_at_least_16 REDIS_URL=redis://localhost:6379 \
   pnpm --filter @anvil/server start
 ```
 
@@ -54,7 +89,7 @@ Send a signed request:
 
 ```bash
 BODY='{"id":"evt_1","type":"charge.succeeded"}'
-SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac whsec_dev | awk '{print $2}')"
+SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac whsec_dev_secret_at_least_16 | awk '{print $2}')"
 curl -i -X POST http://localhost:3000/webhooks \
   -H "x-signature: $SIG" \
   -H "content-type: application/json" \
@@ -65,9 +100,13 @@ You get back `202 { "jobId": "...", "replayed": false }`. Send the same request
 again and `replayed` is `true` with the same `jobId`; the worker still runs the
 job once.
 
+The secret must be at least 16 characters; `createServer` throws on a shorter
+one. The server also exposes `/healthz` (liveness) and `/readyz` (readiness,
+which pings Redis).
+
 ## Docker
 
-Local dev — Redis, server, and worker in one command:
+Local dev, Redis, server, and worker in one command:
 
 ```bash
 docker compose up --build
@@ -76,61 +115,30 @@ docker compose up --build
 The server listens on `:3000`. Both app images are multi-stage
 `node:20-alpine` builds that run as a non-root user; see
 [apps/server/Dockerfile](./apps/server/Dockerfile) and
-[apps/worker/Dockerfile](./apps/worker/Dockerfile).
-
-## Contracts
-
-These five behaviours have tests. Each is the reason a line of code exists.
-
-- **One job per delivery.** The idempotency key is `sha256(signature + raw
-  payload)`. Re-delivering a webhook N times enqueues one job; the server
-  returns the original job id with `replayed: true`. A different body under the
-  same signature is a different key, so it gets its own job.
-- **Constant-time signature check.** `verify(body, sigHeader, secret)` accepts a
-  valid `sha256=<hex>` signature and rejects a tampered body or a flipped
-  signature byte. It compares with `crypto.timingSafeEqual` and guards the
-  length check first so the compare never throws.
-- **Fixed retry backoff.** Failed jobs retry on `[1000, 5000, 30000, 300000]`
-  ms. After the fourth failure the job moves to `webhooks.dead` carrying
-  `failureContext: { attempts, lastError }`.
-- **Replay is a separate consumer.** `replayDeadLetter(jobId)` moves a dead job
-  back to the main queue and returns `{ replayed: true }`. The replay module
-  starts no worker on the main queue, so importing it cannot kick off a retry
-  loop.
-- **Small SDK surface.** `@ykstormsorg/anvil` exports exactly `createServer`,
-  `createWorker`, and `replayDeadLetter`. `createServer({ secret })` returns an
-  Express app; `createWorker(handler, opts)` returns `{ start, close }`;
-  `replayDeadLetter` is async.
-
-See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the request flow and the
-other docs for the reasoning behind each contract.
+[apps/worker/Dockerfile](./apps/worker/Dockerfile). The project does not publish
+a prebuilt image; build your own from these Dockerfiles.
 
 ## Performance
 
-Signature verification runs on every inbound webhook, and "constant-time"
-should mean what it says. Measured in CI (GitHub Actions `ubuntu-latest`,
-Node 20) — the numbers below are produced by
-[`.github/workflows/benchmark.yml`](.github/workflows/benchmark.yml) on every
-push, over 500k verifications of a ~340-byte payload:
+The committed numbers come from one local run of `node bench/throughput.mjs` on
+Node 24, recorded in [bench/report-latest.md](./bench/report-latest.md):
 
-| Metric | Result |
+| Metric | Value |
 |---|---|
-| Per-verify cost | **~3.3 µs** (~305k verifies/sec) |
-| Valid vs same-length **wrong** signature | **0.9% timing delta** |
-| Ingress throughput | **~10.5k req/s** (verify → dedupe → enqueue, in-memory queue) |
-| Ingress latency p50 / p99 | **4 ms / 8 ms** |
+| Ingress throughput | ~8,800 req/s |
+| Ingress latency p50 / p99 | 5 ms / 13 ms |
 
-A sub-1% delta between a valid signature and a same-length forgery is the
-evidence behind the constant-time claim — `timingSafeEqual` plus the
-length-guard means there is no timing or length oracle for an attacker to grind
-against. Reproduce with `node bench/verify.mjs` (Node 24, pure CPU, no Redis).
+That bench drives the real verify, idempotency key, dedupe-enqueue path with an
+**in-memory queue stub** (no Redis, no worker), so it isolates Anvil's own cost,
+not Redis'. It is one machine, one run: your numbers will differ. CI runs the
+benchmark on every push and attaches the output as an artifact
+([benchmark.yml](.github/workflows/benchmark.yml)); it does not commit numbers
+back here.
 
-Ingress throughput is measured over the real verify → idempotency →
-dedupe-enqueue path with an in-memory queue mock (no Redis, no worker), so it
-isolates Anvil's own cost rather than Redis'. Full percentiles and the
-dedupe/reject breakdown are in [bench/report-latest.md](./bench/report-latest.md);
-methodology in [bench/README.md](./bench/README.md). Reproduce with
-`node bench/throughput.mjs`.
+`node bench/verify.mjs` reports per-verify cost and the timing delta between a
+valid signature and a same-length forgery. A small delta is the evidence for the
+constant-time claim: `timingSafeEqual` plus the length guard leaves no timing or
+length oracle. Methodology is in [bench/README.md](./bench/README.md).
 
 ## Deploy
 
@@ -138,32 +146,43 @@ Two ways to stand up the pipeline (server + worker + Redis). Both are 0.x
 scaffolds and provision only what Anvil uses; there is no database.
 
 - **Hetzner Cloud (Terraform):** [infra/terraform/](./infra/terraform/) brings
-  up a Redis VM, the webhook server, and a worker pool whose size is set by
-  `worker_count`. Hetzner has no managed Redis, so the module runs Redis on a
-  VM via cloud-init; the README there explains the trade.
+  up a Redis VM, the webhook server, and a worker pool sized by `worker_count`.
+  `WEBHOOK_SECRET` is not templated into cloud-init (user_data is readable);
+  provision it on the VM after boot. SSH is closed unless you set
+  `ssh_allowed_cidrs`. See the README there.
 - **Kubernetes (Helm):** [charts/anvil/](./charts/anvil/) deploys the server
-  (Deployment + Service + Ingress on `/webhooks`), the worker (replicas =
-  `worker.replicas`), and an in-cluster Redis. `REDIS_URL` and the
-  `WEBHOOK_SECRET` are wired in for you.
+  (Deployment + Service + Ingress on `/webhooks`), the worker, and an in-cluster
+  Redis with a NetworkPolicy. You set `image.repository` (no image is published)
+  and a real `secret.webhookSecret`; the chart refuses the placeholder.
 
 ```bash
 # Terraform
 terraform -chdir=infra/terraform init && terraform -chdir=infra/terraform apply
 
 # Helm
-helm install anvil ./charts/anvil --set secret.webhookSecret=whsec_real
+helm install anvil ./charts/anvil \
+  --set image.repository=ghcr.io/you/anvil \
+  --set secret.webhookSecret=whsec_real
 ```
 
 ## Known limitations
 
 This is 0.1. It is honest about what it is not yet.
 
-- The replay path is single-job and manual. There is no batch-replay tool and
-  no UI.
-- Assumes one Redis and one region. Multi-region delivery and cross-region
-  dedupe are out of scope.
-- Replay-attack timestamp checking is documented but left to the handler; the
-  server does not enforce a timestamp window for you.
+- No container image is published. Build your own from the Dockerfiles.
+- The idempotency key includes the signature header, so an exact re-delivery
+  (same signature and body) dedupes, but a provider that rotates the signature
+  on re-delivery produces a different key. Dedupe on a stable provider event id
+  is out of scope.
+- The HMAC covers the body only. A captured request with a valid signature can
+  be replayed; enforce a timestamp window in your handler if your provider signs
+  one. The idempotency key still collapses a byte-for-byte resend.
+- The SDK's `./internal/*` subpath is exported and therefore importable by
+  consumers. Treat it as unstable: it exists for the apps and bench in this repo,
+  not as public API.
+- The replay path is single-job and manual; no batch tool and no UI.
+- One Redis, one region. Multi-region delivery and cross-region dedupe are out
+  of scope.
 
 ## Roadmap
 
