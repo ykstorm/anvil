@@ -3,30 +3,30 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 /**
  * Verify an HMAC-SHA256 webhook signature in constant time.
  *
- * The signature header has the shape `sha256=<hex>`. We recompute the digest
- * over the raw body bytes with the shared secret, then compare in constant
- * time. The length guard before timingSafeEqual matters: timingSafeEqual
- * throws RangeError when the two buffers differ in length, which would both
- * crash and leak a length oracle. Reject length mismatches up front instead.
+ * The header has the shape `sha256=<hex>`. We recompute the digest over the raw
+ * body bytes with the shared secret and compare with crypto.timingSafeEqual
+ * after a length check. The length guard matters twice over: timingSafeEqual
+ * throws on unequal-length buffers, which would both crash the request and leak
+ * a length oracle, so a mismatch returns false up front.
  *
- * Pass the raw body string or Buffer exactly as received. Do NOT JSON.parse
- * and re-stringify before calling this — re-serialization changes bytes and
- * breaks the signature.
- *
- * This is the single source of truth for signature verification, shared by the
- * SDK's createServer and by apps/server. See docs/SECURITY.md.
+ * Pass the raw body exactly as received. Do not JSON.parse and re-stringify
+ * first, that changes the bytes and breaks the signature. See docs/SECURITY.md.
  */
 export function verify(
   body: string | Buffer,
   signatureHeader: string,
   secret: string,
 ): boolean {
+  // An empty secret can never produce a trustworthy HMAC; reject outright.
+  if (!secret) {
+    return false;
+  }
+
   if (typeof signatureHeader !== "string" || !signatureHeader.startsWith("sha256=")) {
     return false;
   }
 
   const provided = signatureHeader.slice("sha256=".length);
-  // A valid hex sha256 digest is 64 chars; bail on anything malformed.
   if (!/^[0-9a-f]+$/i.test(provided)) {
     return false;
   }
@@ -36,7 +36,6 @@ export function verify(
   const providedBuf = Buffer.from(provided, "hex");
   const expectedBuf = Buffer.from(expected, "hex");
 
-  // Length guard before timingSafeEqual: unequal lengths throw otherwise.
   if (providedBuf.length !== expectedBuf.length) {
     return false;
   }

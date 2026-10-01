@@ -39,13 +39,60 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-redis" (include "anvil.fullname" .) -}}
 {{- end -}}
 
-{{/* REDIS_URL the server and worker connect with. */}}
+{{/* Whether Redis auth (requirepass) is in play. */}}
+{{- define "anvil.redisAuthEnabled" -}}
+{{- if or .Values.redis.password .Values.redis.existingSecret -}}true{{- end -}}
+{{- end -}}
+
+{{/* Name of the Secret holding the Redis password. */}}
+{{- define "anvil.redisSecretName" -}}
+{{- if .Values.redis.existingSecret -}}
+{{- .Values.redis.existingSecret -}}
+{{- else -}}
+{{- printf "%s-redis" (include "anvil.fullname" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Key inside the Redis Secret holding the password. */}}
+{{- define "anvil.redisSecretKey" -}}
+{{- if .Values.redis.existingSecret -}}
+{{- .Values.redis.existingSecretKey -}}
+{{- else -}}
+redis-password
+{{- end -}}
+{{- end -}}
+
+{{/*
+REDIS_URL the server and worker connect with. For the in-cluster Redis the
+password, when set, is injected at runtime via the $(REDIS_PASSWORD) env var
+(defined before REDIS_URL in each container), so the secret never appears in the
+rendered manifest. For an external Redis (deploy=false) pass the full redis.url.
+*/}}
 {{- define "anvil.redisUrl" -}}
 {{- if .Values.redis.deploy -}}
+{{- if include "anvil.redisAuthEnabled" . -}}
+{{- printf "redis://:$(REDIS_PASSWORD)@%s:%v" (include "anvil.redisFullname" .) .Values.redis.port -}}
+{{- else -}}
 {{- printf "redis://%s:%v" (include "anvil.redisFullname" .) .Values.redis.port -}}
+{{- end -}}
 {{- else -}}
 {{- required "redis.url is required when redis.deploy is false" .Values.redis.url -}}
 {{- end -}}
+{{- end -}}
+
+{{/*
+Resolve a component image "repo:tag". Call as (list . <component image repo>).
+The repo defaults to image.repository; both being empty is an error, since the
+project publishes no image.
+*/}}
+{{- define "anvil.image" -}}
+{{- $root := index . 0 -}}
+{{- $override := index . 1 -}}
+{{- $repo := $override | default $root.Values.image.repository -}}
+{{- if not $repo -}}
+{{- fail "image.repository is required: the project publishes no image, so build apps/server/Dockerfile and apps/worker/Dockerfile, push them, and set image.repository (or server.image.repository / worker.image.repository). See charts/anvil/README.md." -}}
+{{- end -}}
+{{- printf "%s:%s" $repo $root.Values.image.tag -}}
 {{- end -}}
 
 {{/* Name of the Secret holding WEBHOOK_SECRET. */}}

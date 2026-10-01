@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as sdk from "../src/index.js";
 import { createServer, createWorker, replayDeadLetter } from "../src/index.js";
+import { TEST_SECRET } from "./helpers.js";
 
 describe("SDK public surface", () => {
   it("exports exactly createServer, createWorker, replayDeadLetter", () => {
@@ -10,7 +11,7 @@ describe("SDK public surface", () => {
   });
 
   it("createServer({ secret }) returns an Express app (has .listen)", () => {
-    const app = createServer({ secret: "whsec_x" });
+    const app = createServer({ secret: TEST_SECRET });
     expect(typeof app.listen).toBe("function");
     expect(typeof app.use).toBe("function");
   });
@@ -22,10 +23,8 @@ describe("SDK public surface", () => {
   });
 
   it("replayDeadLetter is async (returns a Promise)", () => {
-    // Call shape only; no Redis round-trip. We assert the return is thenable.
     const ret = replayDeadLetter("job_1", { redisUrl: "redis://localhost:6379" });
     expect(typeof (ret as Promise<unknown>).then).toBe("function");
-    // Swallow the rejection (no Redis here) so the test does not warn.
     void (ret as Promise<unknown>).catch(() => {});
   });
 });

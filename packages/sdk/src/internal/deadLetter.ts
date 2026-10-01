@@ -5,6 +5,12 @@ import { RETRY_JOB_OPTIONS } from "./retry.js";
 
 export const DEAD_QUEUE_NAME = "webhooks.dead";
 
+/** Cap on a stored error message, so one huge error cannot bloat Redis. */
+const MAX_ERROR_LENGTH = 2048;
+
+/** Strip query-string secrets out of an error before it is persisted. */
+const SECRET_QS = /([?&](?:key|token|secret|sig)=)[^&\s]+/gi;
+
 export interface FailureContext {
   attempts: number;
   lastError: string;
@@ -18,29 +24,35 @@ export interface DeadJobData {
 }
 
 /**
+ * Redact credential-looking query params and truncate, so a dead-letter record
+ * never persists a secret an upstream error happened to echo back in a URL.
+ */
+export function sanitizeErrorMessage(message: string): string {
+  return message.replace(SECRET_QS, "$1REDACTED").slice(0, MAX_ERROR_LENGTH);
+}
+
+/**
  * Build a handler that moves an exhausted job onto the dead-letter queue,
- * stamping it with failureContext. Wire it to a Worker's "failed" event for
- * jobs whose attemptsMade has reached MAX_ATTEMPTS.
+ * stamping it with a sanitized failureContext, then removes the main-queue
+ * copy. Wire it to a Worker's "failed" event for jobs that have reached
+ * MAX_ATTEMPTS.
  *
- * This module deliberately does NOT construct a BullMQ Worker. Importing it
- * starts no consumer; the dead-letter queue is drained by a separate, manually
- * run process (see replayDeadLetter and docs/DEAD_LETTER.md). That separation
- * is what stops a runaway auto-retry loop on the main queue.
- *
- * Single source of truth, shared by the SDK's createWorker, replayDeadLetter,
- * and apps/worker.
+ * This module never constructs a BullMQ Worker: importing it starts no
+ * consumer. The dead-letter queue is drained by a separate, manually run
+ * process (see replayDeadLetter), which is what stops a runaway retry loop.
  */
 export function makeDeadLetterHandler(deadQueue: Queue) {
   return async function onDead(job: Job, err: Error): Promise<void> {
     const failureContext: FailureContext = {
       attempts: job.attemptsMade,
-      lastError: err?.message ?? String(err),
+      lastError: sanitizeErrorMessage(err?.message ?? String(err)),
     };
-    // Let the dead-letter queue auto-assign the job id. BullMQ rejects a custom
-    // jobId that parses as an integer ("Custom Ids cannot be integers"), and the
-    // main queue's auto ids are exactly that. Keep the origin id in the data for
-    // tracing instead of forcing it as the DLQ job id.
+    // Let the dead queue auto-assign the id: BullMQ rejects a custom jobId that
+    // parses as an integer, and the main queue's auto ids are exactly that.
+    // Keep the origin id in the data for tracing instead.
     await deadQueue.add(job.name, { ...job.data, failureContext, originalJobId: job.id });
+    // Drop the main-queue copy now that it is safely on the dead queue.
+    await job.remove();
   };
 }
 
@@ -56,33 +68,52 @@ export interface ReplayResult {
   jobId: string;
 }
 
+interface OpenedQueues {
+  mainQueue: Queue;
+  deadQueue: Queue;
+  ownConnection: IORedis | null;
+}
+
+/**
+ * Resolve the main and dead queues for a replay. Caller-supplied queues are
+ * used as-is; otherwise a connection is opened here and returned so the caller
+ * can close exactly what it created.
+ */
+function openReplayQueues(deps: ReplayDeps): OpenedQueues {
+  if (deps.mainQueue || deps.deadQueue) {
+    const mainName = deps.mainQueueName ?? "webhooks";
+    return {
+      mainQueue: deps.mainQueue ?? new Queue(mainName, { connection: new IORedis() }),
+      deadQueue: deps.deadQueue ?? new Queue(`${mainName}.dead`, { connection: new IORedis() }),
+      ownConnection: null,
+    };
+  }
+
+  const ownConnection = new IORedis(
+    deps.redisUrl ?? process.env.REDIS_URL ?? "redis://localhost:6379",
+    { maxRetriesPerRequest: null },
+  );
+  const mainName = deps.mainQueueName ?? "webhooks";
+  return {
+    mainQueue: new Queue(mainName, { connection: ownConnection }),
+    deadQueue: new Queue(`${mainName}.dead`, { connection: ownConnection }),
+    ownConnection,
+  };
+}
+
 /**
  * Replay a single dead-lettered job back onto the main queue.
  *
- * Runs as its own consumer (a CLI invocation), separate from the worker. It
- * reads the dead job, re-adds the original payload to the main queue, removes
- * the dead copy, and returns `{ replayed: true }`. Pass live queues for tests,
- * or a redisUrl for the CLI/SDK path.
- *
- * Replaying is a manual, gated action so a broken handler cannot put failures
- * into an endless auto-retry loop. Importing this module starts no worker.
+ * Runs as its own consumer (a CLI invocation), separate from the worker: it
+ * reads the dead job, re-adds the original payload with the full retry schedule,
+ * removes the dead copy, and returns { replayed: true }. Replaying is a manual,
+ * gated action so a broken handler cannot drive an endless auto-retry loop.
  */
 export async function replayDeadLetter(
   jobId: string,
   deps: ReplayDeps = {},
 ): Promise<ReplayResult> {
-  const ownConnection =
-    deps.mainQueue || deps.deadQueue
-      ? null
-      : new IORedis(deps.redisUrl ?? process.env.REDIS_URL ?? "redis://localhost:6379", {
-          maxRetriesPerRequest: null,
-        });
-
-  const mainName = deps.mainQueueName ?? "webhooks";
-  const mainQueue =
-    deps.mainQueue ?? new Queue(mainName, { connection: ownConnection! });
-  const deadQueue =
-    deps.deadQueue ?? new Queue(`${mainName}.dead`, { connection: ownConnection! });
+  const { mainQueue, deadQueue, ownConnection } = openReplayQueues(deps);
 
   try {
     const dead = await deadQueue.getJob(jobId);
@@ -90,17 +121,17 @@ export async function replayDeadLetter(
       return { replayed: false, jobId };
     }
 
-    const { failureContext, ...payload } = dead.data as DeadJobData;
-    void failureContext; // dropped on replay; the retry counter resets
-    // Replay with the full retry schedule: a replayed job that fails again must
-    // follow the same [1s,5s,30s,5m] backoff and dead-letter after MAX_ATTEMPTS,
-    // not fail once and bounce straight back to the dead-letter queue.
+    // Drop both the failure context and the origin id: the replayed job is a
+    // clean attempt with a reset retry counter, not a continuation of the old
+    // one, and it must follow the full [1s,5s,30s,5m] schedule again.
+    const { failureContext, originalJobId, ...payload } = dead.data as DeadJobData;
+    void failureContext;
+    void originalJobId;
     const revived = await mainQueue.add(dead.name, payload, { ...RETRY_JOB_OPTIONS });
     await dead.remove();
 
     return { replayed: true, jobId: revived.id ?? jobId };
   } finally {
-    // Only close queues we created here; caller-owned queues stay open.
     if (ownConnection) {
       await mainQueue.close();
       await deadQueue.close();

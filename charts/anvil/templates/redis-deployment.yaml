@@ -18,7 +18,7 @@ spec:
         {{- include "anvil.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: redis
     spec:
-      # Redis serves the queue only — it has no need for a Kubernetes API token.
+      # Redis serves the queue only, it has no need for a Kubernetes API token.
       automountServiceAccountToken: false
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
@@ -39,6 +39,18 @@ spec:
             - "noeviction"
             - "--dir"
             - "/data"
+            {{- if include "anvil.redisAuthEnabled" . }}
+            - "--requirepass"
+            - "$(REDIS_PASSWORD)"
+            {{- end }}
+          {{- if include "anvil.redisAuthEnabled" . }}
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "anvil.redisSecretName" . }}
+                  key: {{ include "anvil.redisSecretKey" . }}
+          {{- end }}
           volumeMounts:
             - name: data
               mountPath: /data
@@ -52,7 +64,12 @@ spec:
             periodSeconds: 20
           readinessProbe:
             exec:
+              {{- if include "anvil.redisAuthEnabled" . }}
+              # Authenticate the probe; without this requirepass makes ping NOAUTH.
+              command: ["sh", "-c", "redis-cli --no-auth-warning -a \"$REDIS_PASSWORD\" ping"]
+              {{- else }}
               command: ["redis-cli", "ping"]
+              {{- end }}
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:

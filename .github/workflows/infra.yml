@@ -1,7 +1,7 @@
 name: Infra
 
 # Terraform + Helm validation. Runs only when the infra or chart sources change
-# (not on every push) — it depends on registry.terraform.io for provider
+# (not on every push), it depends on registry.terraform.io for provider
 # schemas, which rate-limits anonymous downloads, so scoping it keeps the
 # default CI fast and green.
 on:
@@ -16,13 +16,16 @@ on:
       - 'infra/terraform/**'
       - 'charts/anvil/**'
 
+permissions:
+  contents: read
+
 jobs:
   infra:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: hashicorp/setup-terraform@v4
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
         with:
           terraform_version: 1.9.8
           terraform_wrapper: false
@@ -44,7 +47,7 @@ jobs:
       - name: Terraform fmt
         run: terraform -chdir=infra/terraform fmt -check -recursive
 
-      - uses: azure/setup-helm@v5
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.16.2
 
@@ -55,8 +58,10 @@ jobs:
           tar -xzf kubeconform.tar.gz kubeconform
           sudo install kubeconform /usr/local/bin/kubeconform
 
+      # The chart intentionally requires image.repository and a real webhook
+      # secret, so validation passes placeholder values.
       - name: Helm lint
-        run: helm lint charts/anvil
+        run: helm lint charts/anvil --set image.repository=ghcr.io/example/anvil --set secret.webhookSecret=whsec_ci_placeholder
 
       - name: Helm template + kubeconform
-        run: helm template charts/anvil | kubeconform -strict -summary -ignore-missing-schemas
+        run: helm template charts/anvil --set image.repository=ghcr.io/example/anvil --set secret.webhookSecret=whsec_ci_placeholder | kubeconform -strict -summary -ignore-missing-schemas

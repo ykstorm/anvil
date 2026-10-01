@@ -8,8 +8,8 @@ function sign(body: string): string {
 }
 
 // Wrap node:crypto so we can observe timingSafeEqual without redefining a
-// non-configurable ESM namespace property (vi.spyOn fails on those). vi.mock
-// is hoisted; we keep a reference to the spy on a module-level holder.
+// non-configurable ESM namespace property. vi.mock is hoisted; a module-level
+// holder keeps the reference to the spy.
 const timingSafeEqualSpy = vi.fn();
 
 vi.mock("node:crypto", async () => {
@@ -29,16 +29,14 @@ beforeEach(() => {
 
 describe("verify uses crypto.timingSafeEqual", () => {
   it("calls timingSafeEqual for a length-matched comparison", async () => {
-    const { verify } = await import("../src/verify.js");
+    const { verify } = await import("../src/internal/verify.js");
     const body = '{"amount":100}';
     verify(body, sign(body), secret);
     expect(timingSafeEqualSpy).toHaveBeenCalledTimes(1);
   });
 
   it("does NOT call timingSafeEqual when digest lengths differ (guards the throw)", async () => {
-    const { verify } = await import("../src/verify.js");
-    // A short, length-mismatched hex must be rejected before timingSafeEqual,
-    // otherwise timingSafeEqual throws RangeError on unequal-length buffers.
+    const { verify } = await import("../src/internal/verify.js");
     const result = verify("{}", "sha256=abcd", secret);
     expect(result).toBe(false);
     expect(timingSafeEqualSpy).not.toHaveBeenCalled();

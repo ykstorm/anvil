@@ -1,6 +1,8 @@
 locals {
-  # Every app VM talks to Redis over the private network.
-  redis_url = "redis://${var.redis_private_ip}:6379"
+  # Every app VM talks to Redis over the private network. When a password is
+  # set, it is folded into the URL (url-encoded) so the app authenticates.
+  redis_auth = var.redis_password != "" ? ":${urlencode(var.redis_password)}@" : ""
+  redis_url  = "redis://${local.redis_auth}${var.redis_private_ip}:6379"
 }
 
 # --- Anvil webhook server ---
@@ -14,9 +16,9 @@ resource "hcloud_server" "server" {
   ssh_keys    = [hcloud_ssh_key.anvil.id]
 
   user_data = templatefile("${path.module}/templates/server-cloud-init.yaml.tftpl", {
-    redis_url      = local.redis_url
-    webhook_secret = var.webhook_secret
-    port           = var.server_port
+    redis_url = local.redis_url
+    port      = var.server_port
+    git_ref   = var.anvil_git_ref
   })
 
   network {
@@ -41,11 +43,16 @@ resource "hcloud_firewall" "server" {
     source_ips = ["0.0.0.0/0", "::/0"]
   }
 
-  rule {
-    direction  = "in"
-    protocol   = "tcp"
-    port       = "22"
-    source_ips = ["0.0.0.0/0", "::/0"]
+  # SSH is opened only to the CIDRs you name. With the default empty list there
+  # is no SSH rule at all, so the box is not reachable on 22 from anywhere.
+  dynamic "rule" {
+    for_each = length(var.ssh_allowed_cidrs) > 0 ? [1] : []
+    content {
+      direction  = "in"
+      protocol   = "tcp"
+      port       = "22"
+      source_ips = var.ssh_allowed_cidrs
+    }
   }
 }
 
@@ -68,6 +75,7 @@ resource "hcloud_server" "worker" {
 
   user_data = templatefile("${path.module}/templates/worker-cloud-init.yaml.tftpl", {
     redis_url = local.redis_url
+    git_ref   = var.anvil_git_ref
   })
 
   network {
@@ -82,16 +90,20 @@ resource "hcloud_server" "worker" {
   depends_on = [hcloud_server.redis]
 }
 
-# Workers accept no inbound application traffic; only SSH for operators.
+# Workers accept no inbound application traffic. SSH is opened only to the CIDRs
+# you name; with the default empty list the worker firewall has no rules at all.
 resource "hcloud_firewall" "worker" {
   count = var.worker_count > 0 ? 1 : 0
   name  = "${var.name_prefix}-worker-fw"
 
-  rule {
-    direction  = "in"
-    protocol   = "tcp"
-    port       = "22"
-    source_ips = ["0.0.0.0/0", "::/0"]
+  dynamic "rule" {
+    for_each = length(var.ssh_allowed_cidrs) > 0 ? [1] : []
+    content {
+      direction  = "in"
+      protocol   = "tcp"
+      port       = "22"
+      source_ips = var.ssh_allowed_cidrs
+    }
   }
 }
 

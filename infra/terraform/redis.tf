@@ -11,8 +11,9 @@ resource "hcloud_server" "redis" {
   ssh_keys    = [hcloud_ssh_key.anvil.id]
 
   user_data = templatefile("${path.module}/templates/redis-cloud-init.yaml.tftpl", {
-    redis_bind_ip = var.redis_private_ip
-    maxmemory_mb  = var.redis_maxmemory_mb
+    redis_bind_ip  = var.redis_private_ip
+    maxmemory_mb   = var.redis_maxmemory_mb
+    redis_password = var.redis_password
   })
 
   network {
@@ -39,11 +40,15 @@ resource "hcloud_firewall" "redis" {
     source_ips = [var.subnet_ip_range]
   }
 
-  rule {
-    direction  = "in"
-    protocol   = "tcp"
-    port       = "22"
-    source_ips = ["0.0.0.0/0", "::/0"]
+  # SSH only to the CIDRs you name; none by default.
+  dynamic "rule" {
+    for_each = length(var.ssh_allowed_cidrs) > 0 ? [1] : []
+    content {
+      direction  = "in"
+      protocol   = "tcp"
+      port       = "22"
+      source_ips = var.ssh_allowed_cidrs
+    }
   }
 }
 

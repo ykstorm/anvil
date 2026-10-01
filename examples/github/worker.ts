@@ -25,7 +25,6 @@ const worker = createWorker(
       console.log("ignoring event", Object.keys(event).slice(0, 4).join(","));
     }
   },
-  { queueName: "webhooks" },
 );
 
 await worker.start();

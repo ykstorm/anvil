@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Queue, QueueEvents, Worker } from "bullmq";
 import IORedis, { type Redis } from "ioredis";
-import { BACKOFF_MS, backoffDelay, MAX_ATTEMPTS } from "../src/retry.js";
-import { DEAD_QUEUE_NAME, makeDeadLetterHandler } from "../src/dead-letter.js";
+import { BACKOFF_MS, backoffDelay, MAX_ATTEMPTS } from "../src/internal/retry.js";
+import { DEAD_QUEUE_NAME, makeDeadLetterHandler } from "../src/internal/deadLetter.js";
 import { REDIS_URL, uniqueQueueName, waitFor } from "./helpers.js";
 
 /** Pure backoff-schedule assertions run everywhere. */
@@ -16,7 +16,6 @@ describe("retry backoff schedule", () => {
   });
 
   it("backoffDelay maps attempt number to the right delay", () => {
-    // BullMQ passes attemptsMade starting at 1 for the first retry decision.
     expect(backoffDelay(1)).toBe(1000);
     expect(backoffDelay(2)).toBe(5000);
     expect(backoffDelay(3)).toBe(30000);
@@ -30,17 +29,16 @@ describe("retry backoff schedule", () => {
 
 const gated = REDIS_URL ? describe : describe.skip;
 
-gated("dead-letter after exhaustion (Redis-gated: skips locally, runs in CI)", () => {
+gated("dead-letter after exhaustion (Redis-gated)", () => {
   let connection: Redis;
   let queue: Queue;
   let deadQueue: Queue;
   let worker: Worker;
   let events: QueueEvents;
-  let queueName: string;
 
   beforeAll(async () => {
     connection = new IORedis(REDIS_URL!, { maxRetriesPerRequest: null });
-    queueName = uniqueQueueName();
+    const queueName = uniqueQueueName();
     queue = new Queue(queueName, { connection });
     deadQueue = new Queue(`${queueName}.dead`, { connection });
     events = new QueueEvents(queueName, { connection });
@@ -50,17 +48,14 @@ gated("dead-letter after exhaustion (Redis-gated: skips locally, runs in CI)", (
 
     const onDead = makeDeadLetterHandler(deadQueue);
 
-    // A handler that always throws, with a fast backoff override so the test
-    // exhausts all 4 attempts in well under a second instead of ~5.5 minutes.
+    // Always-throwing handler with a fast backoff override so the test exhausts
+    // all 4 attempts in well under a second instead of ~5.5 minutes.
     worker = new Worker(
       queueName,
       async () => {
         throw new Error("handler always fails");
       },
-      {
-        connection,
-        settings: { backoffStrategy: () => 10 },
-      },
+      { connection, settings: { backoffStrategy: () => 10 } },
     );
     worker.on("failed", async (job, err) => {
       if (job && job.attemptsMade >= MAX_ATTEMPTS) {
@@ -79,7 +74,7 @@ gated("dead-letter after exhaustion (Redis-gated: skips locally, runs in CI)", (
     await connection.quit();
   });
 
-  it("moves a job to webhooks.dead with failureContext after the 4th failure", async () => {
+  it("moves a job to the dead queue with failureContext after the 4th failure", async () => {
     await queue.add(
       "webhook",
       { body: '{"id":"evt_fail"}' },

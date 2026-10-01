@@ -3,13 +3,20 @@ package_update: true
 packages:
   - git
   - curl
+  - gnupg
 
 write_files:
+  # REDIS_URL and PORT only. WEBHOOK_SECRET is deliberately NOT written here:
+  # cloud-init user_data is readable from the instance metadata service and the
+  # provider console, so a secret placed in it would be exposed. After the VM
+  # boots, provision the secret out of band, for example:
+  #   ssh root@<server> 'echo WEBHOOK_SECRET=whsec_... >> /etc/anvil/server.env \
+  #     && systemctl restart anvil-server'
+  # The unit stays in a restart loop until the secret is present.
   - path: /etc/anvil/server.env
     permissions: "0600"
     content: |
       REDIS_URL=${redis_url}
-      WEBHOOK_SECRET=${webhook_secret}
       PORT=${port}
 
   - path: /etc/systemd/system/anvil-server.service
@@ -34,11 +41,16 @@ write_files:
       WantedBy=multi-user.target
 
 runcmd:
-  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  # Node 20 from NodeSource via a signed apt repo (keyring), not curl | bash.
+  - install -d -m 0755 /etc/apt/keyrings
+  - curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+  - echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
+  - apt-get update
   - apt-get install -y nodejs
   - npm install -g pnpm@9
   - useradd --system --create-home --shell /usr/sbin/nologin anvil || true
   - git clone https://github.com/ykstorm/anvil.git /opt/anvil
+  - git -C /opt/anvil checkout ${git_ref}
   - bash -lc 'cd /opt/anvil && pnpm install --frozen-lockfile && pnpm -r build'
   - chown -R anvil:anvil /opt/anvil
   - systemctl daemon-reload

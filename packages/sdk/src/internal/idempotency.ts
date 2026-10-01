@@ -9,8 +9,6 @@ import { createHash } from "node:crypto";
  * bytes into the key means a genuine re-delivery of the same body collapses to
  * one key, while two different bodies never collide even under a shared
  * signature. See docs/IDEMPOTENCY.md.
- *
- * Single source of truth, shared by the SDK's createServer and apps/server.
  */
 export function computeIdempotencyKey(
   signatureHeader: string,
