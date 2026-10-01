@@ -31,5 +31,5 @@ backoff schedule, and dead-letter after the fourth failure.
 
 ## Files
 
-- `server.ts` — the ingress: verify, dedupe, enqueue, 202.
-- `worker.ts` — the handler with a per-event-type switch.
+- `server.ts`, the ingress: verify, dedupe, enqueue, 202.
+- `worker.ts`, the handler with a per-event-type switch.
