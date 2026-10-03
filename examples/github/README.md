@@ -28,5 +28,5 @@ Point a repository's webhook (Settings to Webhooks) at the server with content
 type `application/json` and the same secret. Push a commit, open a pull request,
 or file an issue, the worker logs each. Re-delivering the same event (GitHub's
 "Redeliver" button) is deduped to a single job. A handler that throws moves the
-delivery onto Anvil's retry schedule `[1s, 5s, 30s, 5m]`, then to the
-`webhooks.dead` queue with a `failureContext`.
+delivery onto Anvil's retry schedule (retries after 1s, 5s and 30s), then, after
+the fourth failure, to the `webhooks.dead` queue with a `failureContext`.

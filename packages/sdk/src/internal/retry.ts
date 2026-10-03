@@ -1,14 +1,16 @@
 /**
- * Retry backoff schedule, in milliseconds: 1s, 5s, 30s, 5m.
+ * Retry backoff: 1s, 5s, 30s. Three waits, four attempts; after the fourth
+ * failure the job is dead-lettered.
  *
- * Four entries, four attempts before a job is dead-lettered. The spread rides
- * out short provider blips early and gives a downstream outage time to recover
- * before the last try, without retrying so long that a poison message clogs the
- * queue for hours.
+ * A wait only happens between two attempts, so N waits make N + 1 attempts and
+ * nothing waits after the last one. That is why the schedule has three entries
+ * and not four: a fourth would never be used. The waits add up to 36 seconds.
+ * Values are in milliseconds.
  */
-export const BACKOFF_MS: readonly number[] = [1000, 5000, 30000, 300000];
+export const BACKOFF_MS: readonly number[] = [1000, 5000, 30000];
 
-export const MAX_ATTEMPTS = BACKOFF_MS.length;
+/** The first try plus one retry per wait: 4. */
+export const MAX_ATTEMPTS = BACKOFF_MS.length + 1;
 
 /**
  * Per-job retry options every main-queue job must carry. Apply these on enqueue

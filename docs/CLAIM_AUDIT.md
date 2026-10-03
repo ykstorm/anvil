@@ -10,7 +10,7 @@ Redis-backed integration assertions run in CI against a `redis:7` service.
 | Idempotency key `sha256(signature header + raw body)` | `packages/sdk/src/internal/idempotency.ts` | `packages/sdk/test/idempotency.test.ts` |
 | Atomic dedupe: one job per key, even under concurrency | `packages/sdk/src/internal/enqueue.ts`, `SET key 1 NX EX <ttl>` on the queue's Redis client | `packages/sdk/test/idempotency.test.ts` (incl. a 20-way concurrent case, Redis-gated) |
 | One source of truth for the builders (apps are thin CLIs, no copy-paste) | `apps/server/src/index.ts` and `apps/worker/src/index.ts` import `createServer` / `createWorker` from `@ykstormsorg/anvil` | typecheck + `apps/*/test` |
-| Retry backoff `[1s, 5s, 30s, 5m]` | `packages/sdk/src/internal/retry.ts`, `BACKOFF_MS`, wired as the BullMQ `backoffStrategy` | `packages/sdk/test/retry.test.ts` |
+| Retry backoff `[1s, 5s, 30s]`: three waits, four attempts, then dead-letter | `packages/sdk/src/internal/retry.ts`, `BACKOFF_MS` and `MAX_ATTEMPTS`, wired as the BullMQ `backoffStrategy` and the job `attempts` | `packages/sdk/test/retry.test.ts` |
 | Dead-letter + replay via a separate consumer (a broken handler can't loop); error redacted + truncated; main copy removed | `packages/sdk/src/internal/deadLetter.ts` + `replayDeadLetter` (starts no `Worker`) | `packages/sdk/test/deadLetter.test.ts` |
 | A replayed job still follows the backoff schedule + re-dead-letters | replay re-adds with the schedule | `packages/sdk/test/replay-schedule.test.ts` (Redis-gated) |
 | HTTP ingress: 202 + jobId, duplicate `replayed: true`, 401 on bad/missing signature, 413 over limit, 503 on enqueue failure | `packages/sdk/src/createServer.ts` | `packages/sdk/test/createServer.test.ts` + `createServer.enqueueFail.test.ts` |

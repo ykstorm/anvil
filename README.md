@@ -35,10 +35,10 @@ Each of these has a test, and each is the reason a line of code exists.
   the HMAC-SHA256 over the raw bytes and compares with `crypto.timingSafeEqual`
   after a length check, so the compare never throws and leaks no length oracle.
   An empty secret, a malformed header, or a length mismatch is a plain `false`.
-- **Fixed retry backoff.** A failing handler retries on `[1s, 5s, 30s, 5m]`.
-  After the fourth failure the job moves to `webhooks.dead` with
-  `failureContext: { attempts, lastError }`, where `lastError` is truncated and
-  has credential-looking query params redacted.
+- **Fixed retry backoff.** A failing handler retries after 1s, 5s and 30s;
+  after the fourth failure the job moves to the dead-letter queue,
+  `webhooks.dead`, with `failureContext: { attempts, lastError }`, where
+  `lastError` is truncated and has credential-looking query params redacted.
 - **Replay is a separate consumer.** `replayDeadLetter(jobId)` moves a dead job
   back to the main queue with a fresh retry schedule and returns
   `{ replayed: true }`. The replay path starts no worker on the main queue, so

@@ -7,22 +7,24 @@ import { REDIS_URL, uniqueQueueName, waitFor } from "./helpers.js";
 
 /** Pure backoff-schedule assertions run everywhere. */
 describe("retry backoff schedule", () => {
-  it("is [1000, 5000, 30000, 300000] ms", () => {
-    expect(BACKOFF_MS).toEqual([1000, 5000, 30000, 300000]);
+  it("is [1000, 5000, 30000] ms", () => {
+    expect(BACKOFF_MS).toEqual([1000, 5000, 30000]);
   });
 
-  it("MAX_ATTEMPTS equals the schedule length (4)", () => {
+  it("MAX_ATTEMPTS is 4: three waits sit between four attempts", () => {
     expect(MAX_ATTEMPTS).toBe(4);
+    // A wait only happens between attempts, so no schedule entry can go unused.
+    expect(MAX_ATTEMPTS).toBe(BACKOFF_MS.length + 1);
   });
 
   it("backoffDelay maps attempt number to the right delay", () => {
     expect(backoffDelay(1)).toBe(1000);
     expect(backoffDelay(2)).toBe(5000);
     expect(backoffDelay(3)).toBe(30000);
-    expect(backoffDelay(4)).toBe(300000);
   });
 
-  it("returns 0 past the schedule (no more retries)", () => {
+  it("returns 0 once the schedule is spent (the 4th attempt onward)", () => {
+    expect(backoffDelay(4)).toBe(0);
     expect(backoffDelay(5)).toBe(0);
   });
 });
@@ -49,7 +51,7 @@ gated("dead-letter after exhaustion (Redis-gated)", () => {
     const onDead = makeDeadLetterHandler(deadQueue);
 
     // Always-throwing handler with a fast backoff override so the test exhausts
-    // all 4 attempts in well under a second instead of ~5.5 minutes.
+    // all 4 attempts in well under a second instead of ~36 seconds.
     worker = new Worker(
       queueName,
       async () => {

@@ -7,7 +7,7 @@ import { REDIS_URL, uniqueQueueName, waitFor } from "./helpers.js";
 
 /**
  * A replayed dead-lettered job that fails again must still follow the full
- * [1s, 5s, 30s, 5m] backoff and dead-letter after the 4th attempt, rather than
+ * [1s, 5s, 30s] backoff and dead-letter after the 4th attempt, rather than
  * resetting to a single-attempt job. Redis-gated like the rest of the suite.
  */
 const gated = REDIS_URL ? describe : describe.skip;
@@ -67,7 +67,7 @@ gated("replay follows the backoff schedule and re-dead-letters", () => {
     await connection.quit();
   });
 
-  it("replayed job exhausts [1s,5s,30s,5m] and dead-letters after the 4th attempt", async () => {
+  it("replayed job exhausts [1s,5s,30s] and dead-letters after the 4th attempt", async () => {
     const seeded = await deadQueue.add(queueName, {
       body: '{"id":"evt_replay_fail"}',
       sig: "sha256=deadbeef",
