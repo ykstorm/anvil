@@ -123,7 +123,7 @@ export async function replayDeadLetter(
 
     // Drop both the failure context and the origin id: the replayed job is a
     // clean attempt with a reset retry counter, not a continuation of the old
-    // one, and it must follow the full [1s,5s,30s,5m] schedule again.
+    // one, and it must follow the full [1s,5s,30s] schedule again.
     const { failureContext, originalJobId, ...payload } = dead.data as DeadJobData;
     void failureContext;
     void originalJobId;

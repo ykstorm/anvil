@@ -26,7 +26,7 @@ sequenceDiagram
         alt handler succeeds
             W-->>Q: complete
         else handler throws
-            W->>Q: retry on backoff [1s, 5s, 30s, 5m]
+            W->>Q: retry after 1s, 5s, 30s
             W->>D: after 4th failure, move to dead queue
         end
     end

@@ -34,7 +34,7 @@ const app = createServer({
 });
 app.listen(3000);
 
-// 2. Worker, runs your handler, retries on [1s, 5s, 30s, 5m], then dead-letters.
+// 2. Worker, runs your handler, retries after 1s, 5s and 30s, then dead-letters.
 const worker = createWorker(async ({ body }) => {
   const event = JSON.parse(body);
   await doTheWork(event);               // throw to trigger a retry
@@ -63,9 +63,9 @@ returns `202`. A duplicate returns the original job's id without enqueuing again
 | `signatureHeader` | `x-signature` | header holding `sha256=<hex>` |
 
 ### `createWorker(handler, options?) to { start, close }`
-Runs `handler({ body, sig }, job)`. On a thrown error it retries on the backoff
-schedule `[1s, 5s, 30s, 5m]`; after the 4th failure the job moves to
-`webhooks.dead` with its failure context. The dead queue is written but never
+Runs `handler({ body, sig }, job)`. On a thrown error it retries after 1s, 5s
+and 30s; after the 4th failure the job moves to the dead-letter queue,
+`webhooks.dead`, with its failure context. The dead queue is written but never
 consumed here, replay is a separate process so a bad job can't drive a retry storm.
 
 ### `replayDeadLetter(jobId, options?) to { replayed, jobId }`
