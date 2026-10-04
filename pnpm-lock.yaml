@@ -35,44 +35,23 @@ importers:
       '@ykstormsorg/anvil':
         specifier: workspace:*
         version: link:../../packages/sdk
-      bullmq:
-        specifier: ^5.34.5
-        version: 5.78.1
-      express:
-        specifier: ^4.21.2
-        version: 4.22.2
-      ioredis:
-        specifier: 5.11.1
-        version: 5.11.1
     devDependencies:
-      '@types/express':
-        specifier: ^4.17.21
-        version: 4.17.25
       '@types/node':
         specifier: ^20.17.10
         version: 20.19.43
-      ioredis-mock:
-        specifier: ^8.9.0
-        version: 8.13.1(@types/ioredis-mock@8.2.7(ioredis@5.11.1))(ioredis@5.11.1)
 
   apps/worker:
     dependencies:
       '@ykstormsorg/anvil':
         specifier: workspace:*
         version: link:../../packages/sdk
-      bullmq:
-        specifier: ^5.34.5
-        version: 5.78.1
-      ioredis:
-        specifier: 5.11.1
-        version: 5.11.1
     devDependencies:
       '@types/node':
         specifier: ^20.17.10
         version: 20.19.43
-      ioredis-mock:
-        specifier: ^8.9.0
-        version: 8.13.1(@types/ioredis-mock@8.2.7(ioredis@5.11.1))(ioredis@5.11.1)
+      bullmq:
+        specifier: ^5.34.5
+        version: 5.78.1
 
   packages/sdk:
     dependencies:
