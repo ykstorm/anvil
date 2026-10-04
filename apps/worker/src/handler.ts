@@ -1,7 +1,5 @@
 import type { WebhookHandler } from "@ykstormsorg/anvil";
 
-export type { WebhookHandler };
-
 /**
  * Default handler: parse the JSON body and log it. Replace this with your own
  * business logic via createWorker(handler). Throwing triggers the retry

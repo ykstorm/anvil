@@ -12,12 +12,10 @@
     "lint": "eslint src test"
   },
   "dependencies": {
-    "@ykstormsorg/anvil": "workspace:*",
-    "bullmq": "^5.34.5",
-    "ioredis": "^5.4.2"
+    "@ykstormsorg/anvil": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.17.10",
-    "ioredis-mock": "^8.9.0"
+    "bullmq": "^5.34.5"
   }
 }
