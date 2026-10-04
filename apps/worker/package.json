@@ -16,6 +16,6 @@
   },
   "devDependencies": {
     "@types/node": "^20.17.10",
-    "bullmq": "^5.34.5"
+    "bullmq": "^5.81.5"
   }
 }
