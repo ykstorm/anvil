@@ -5,32 +5,27 @@ it to a background queue, and lets a worker process it with retries. The HTTP
 request returns as soon as the job is on the queue, so a slow handler never
 makes the sender wait or time out.
 
-```mermaid
-sequenceDiagram
-    participant P as Provider
-    participant S as Server (Express)
-    participant Q as BullMQ (Redis)
-    participant W as Worker
-    participant D as webhooks.dead
+The path of one delivery:
 
-    P->>S: POST /webhooks (raw body + signature)
-    S->>S: verify HMAC-SHA256 (constant time)
-    alt invalid signature
-        S-->>P: 401
-    else valid
-        S->>S: key = sha256(sig + raw body)
-        S->>Q: enqueue with jobId = key
-        Note over Q: duplicate jobId is a no-op
-        S-->>P: 202 { jobId, replayed }
-        Q->>W: deliver job
-        alt handler succeeds
-            W-->>Q: complete
-        else handler throws
-            W->>Q: retry after 1s, 5s, 30s
-            W->>D: after 4th failure, move to dead queue
-        end
-    end
-```
+1. The provider POSTs to `/webhooks` with the raw body and a signature header.
+2. `verify` recomputes the HMAC-SHA256 over the raw bytes and compares it with
+   the signature in constant time.
+
+       valid signature: continue
+       invalid: 401, nothing queued
+
+3. The server computes the idempotency key, `sha256(signature + raw body)`, and
+   claims it with `SET anvil:dedupe:<key> 1 NX EX <ttl>`.
+
+       key claimed: one BullMQ job is added, with the key as its jobId
+       key already set: a duplicate, nothing queued, replayed is true
+
+4. The server answers 202 with `{ jobId, replayed }`.
+5. The worker receives the job and runs the handler.
+
+       handler returns: the job completes
+       handler throws: retry after 1s, 5s, then 30s
+       fourth failure: the job moves to webhooks.dead
 
 The server is the only part that talks to the provider. Its job is small: read
 the raw bytes, verify the signature over those exact bytes, compute the
