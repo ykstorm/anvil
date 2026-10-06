@@ -25,7 +25,10 @@
   },
   "pnpm": {
     "overrides": {
-      "ioredis": "5.11.1"
+      "ioredis": "5.11.1",
+      "proxy-addr": ">=2.0.8",
+      "qs": ">=6.16.0",
+      "body-parser": ">=1.20.6"
     }
   }
 }
