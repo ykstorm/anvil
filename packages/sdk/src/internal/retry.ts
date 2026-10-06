@@ -9,7 +9,12 @@
  */
 export const BACKOFF_MS: readonly number[] = [1000, 5000, 30000];
 
-/** The first try plus one retry per wait: 4. */
+/**
+ * The `attempts` every job carries: the first try plus one retry per wait, 4.
+ * This is what ends retries. Once a job has failed this many times BullMQ
+ * moves it to the failed list without asking backoffDelay again, and the
+ * worker dead-letters it.
+ */
 export const MAX_ATTEMPTS = BACKOFF_MS.length + 1;
 
 /**
@@ -23,9 +28,14 @@ export const RETRY_JOB_OPTIONS = {
 };
 
 /**
- * Delay before the retry for a given attempt (1-based, matching BullMQ's
- * attemptsMade at the backoff decision). Returns 0 once the schedule is spent,
- * signalling no further retry. Register it as a Worker's backoffStrategy.
+ * Delay before the retry that follows a failed attempt. `attempt` is 1-based:
+ * BullMQ passes attemptsMade + 1, the number of the attempt that just failed.
+ * Register it as a Worker's backoffStrategy.
+ *
+ * BullMQ only asks while attempts remain, so with MAX_ATTEMPTS it asks for
+ * attempts 1, 2 and 3 and never past the schedule. The 0 returned out of range
+ * is therefore unused, and it would not stop anything: BullMQ reads 0 as "retry
+ * now" and -1 as "do not retry". MAX_ATTEMPTS is what ends the retries.
  */
 export function backoffDelay(attempt: number): number {
   const idx = attempt - 1;

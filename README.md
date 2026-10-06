@@ -104,8 +104,11 @@ curl -i -X POST http://localhost:3000/webhooks \
 ```
 
 You get back `202 { "jobId": "...", "replayed": false }`. Send the same request
-again and `replayed` is `true` with the same `jobId`; the worker still runs the
-job once.
+again and `replayed` is `true` with the same `jobId`, and no second job is
+queued. That dedupe happens at the door: one delivery becomes one job. Running
+the job is at least once, as with any BullMQ job. If a worker crashes or stalls
+mid-job, the job runs again, so make the handler safe to repeat, for example by
+recording the provider's event id before acting on it.
 
 The secret must be at least 16 characters; `createServer` throws on a shorter
 one. The reason: anyone who captures one signed request can try candidate

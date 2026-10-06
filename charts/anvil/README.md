@@ -8,7 +8,7 @@ Redis is the only datastore.
 
 | Component | Kind | Notes |
 | --- | --- | --- |
-| Server | Deployment + Service + Ingress | Runs `apps/server`. Verifies HMAC, dedupes, enqueues, returns 202. Ingress exposes `POST /webhooks`. Liveness/readiness on `/healthz`. |
+| Server | Deployment + Service + Ingress | Runs `apps/server`. Verifies HMAC, dedupes, enqueues, returns 202. Ingress exposes `POST /webhooks`. Liveness on `/healthz`, readiness on `/readyz` (503 until Redis answers). |
 | Worker | Deployment | Runs `apps/worker`. `worker.replicas` pods drain the BullMQ queue. No ingress. |
 | Redis | Deployment + Service + NetworkPolicy | In-cluster Redis 7 with `appendonly` and `noeviction`. A NetworkPolicy limits ingress on 6379 to the server and worker pods. Optional `requirepass` via `redis.password`. Toggle with `redis.deploy`. |
 | Secret | Secret | Holds `WEBHOOK_SECRET`. Create here or reference an existing one. |
@@ -69,9 +69,15 @@ See `values.yaml`. Common ones:
 
 ## Validation
 
+The chart needs an image and a secret to render, so pass placeholders, as CI
+does:
+
 ```bash
-helm lint charts/anvil
-helm template charts/anvil | kubeconform -strict -ignore-missing-schemas
+helm lint charts/anvil \
+  --set image.repository=ghcr.io/example/anvil --set secret.webhookSecret=whsec_ci_placeholder
+helm template charts/anvil \
+  --set image.repository=ghcr.io/example/anvil --set secret.webhookSecret=whsec_ci_placeholder \
+  | kubeconform -strict -ignore-missing-schemas
 ```
 
 ## Scope
