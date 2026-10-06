@@ -1,6 +1,6 @@
 {
   "name": "@ykstormsorg/anvil",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Idempotent webhook to BullMQ worker pipeline, HMAC-SHA256 verify, dedupe, retry/backoff, dead-letter replay.",
   "keywords": [
     "webhook",
