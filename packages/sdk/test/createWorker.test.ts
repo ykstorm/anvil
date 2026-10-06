@@ -64,3 +64,67 @@ describe("dead queue name", () => {
     expect(read).toContain("orders.dead");
   });
 });
+
+describe("the failed listener", () => {
+  function startedWorker() {
+    const running = createWorker(async () => {});
+    const deadQueue = bull.queues[0]!;
+    return { running, deadQueue };
+  }
+
+  function failedJob(attemptsMade: number) {
+    return {
+      id: "job-1",
+      name: "webhook",
+      attemptsMade,
+      data: { body: "{}", sig: "sha256=x", receivedAt: "2026-01-01T00:00:00.000Z" },
+      remove: vi.fn(async () => {}),
+    };
+  }
+
+  function unrecoverable(message: string): Error {
+    const err = new Error(message);
+    err.name = "UnrecoverableError";
+    return err;
+  }
+
+  async function fail(job: ReturnType<typeof failedJob>, err: Error) {
+    bull.workers[0]!.emit("failed", job, err, "active");
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  it("dead-letters a job BullMQ failed for stalling more than maxStalledCount times", async () => {
+    const { running, deadQueue } = startedWorker();
+    await running.start();
+    const job = failedJob(1);
+
+    await fail(job, unrecoverable("job stalled more than allowable limit"));
+
+    expect(deadQueue.add).toHaveBeenCalledTimes(1);
+    expect(deadQueue.add.mock.calls[0]![1]).toMatchObject({
+      failureContext: { attempts: 1, lastError: "job stalled more than allowable limit" },
+      originalJobId: "job-1",
+    });
+    expect(job.remove).toHaveBeenCalled();
+  });
+
+  it("dead-letters after the last attempt", async () => {
+    const { running, deadQueue } = startedWorker();
+    await running.start();
+
+    await fail(failedJob(4), new Error("handler failed"));
+
+    expect(deadQueue.add).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a failure that BullMQ will retry alone", async () => {
+    const { running, deadQueue } = startedWorker();
+    await running.start();
+    const job = failedJob(2);
+
+    await fail(job, new Error("handler failed"));
+
+    expect(deadQueue.add).not.toHaveBeenCalled();
+    expect(job.remove).not.toHaveBeenCalled();
+  });
+});

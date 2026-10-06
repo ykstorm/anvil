@@ -188,6 +188,11 @@ This is 0.1. It is honest about what it is not yet.
   consumers. Treat it as unstable: it exists for the apps and bench in this repo,
   not as public API.
 - The replay path is single-job and manual; no batch tool and no UI.
+- Dead-lettering runs in the worker on BullMQ's `failed` event. Jobs that spend
+  all four attempts and jobs BullMQ fails for stalling too often both reach the
+  dead queue, but a worker that dies in the middle of the move leaves the job in
+  the main queue's failed list, which is trimmed after the dedupe TTL. See
+  [docs/DEAD_LETTER.md](./docs/DEAD_LETTER.md).
 - One Redis, one region. Multi-region delivery and cross-region dedupe are out
   of scope.
 

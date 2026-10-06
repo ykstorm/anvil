@@ -21,6 +21,19 @@ export interface RunningWorker {
 }
 
 /**
+ * True when BullMQ will not run this job again, so it belongs on the dead
+ * queue: either its attempts are spent, or it failed with UnrecoverableError.
+ * BullMQ raises that itself for a job that stalled more than maxStalledCount
+ * times (its worker crashed or blocked past the lock), failing it the next
+ * time a worker picks it up and emitting "failed" like any other failure, with
+ * attemptsMade still under MAX_ATTEMPTS. A handler may also throw it to skip
+ * the remaining retries.
+ */
+function isFinalFailure(job: Job, err: Error | undefined): boolean {
+  return job.attemptsMade >= MAX_ATTEMPTS || err?.name === "UnrecoverableError";
+}
+
+/**
  * Build a worker that runs `handler`, retries on the backoff schedule, and
  * dead-letters to `<queueName>.dead` (webhooks.dead by default) after
  * MAX_ATTEMPTS. The dead queue is written to but never consumed here; replay
@@ -50,7 +63,7 @@ export function createWorker(
         settings: { backoffStrategy: backoffDelay },
       });
       worker.on("failed", async (job, err) => {
-        if (job && job.attemptsMade >= MAX_ATTEMPTS) {
+        if (job && isFinalFailure(job, err)) {
           // Dead-lettering must never throw back into the failed handler: a
           // throw here would surface as an unhandled rejection and could crash
           // the worker. Log and move on.
