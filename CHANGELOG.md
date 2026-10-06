@@ -1,8 +1,8 @@
 # Changelog
 
-All notable changes to `@ykstormsorg/anvil`. Dates are the day the version was
-published to npm. Anvil is 0.x, so a minor version can break things; items that
-can break an existing install are marked **Breaking**.
+All notable changes to `@ykstormsorg/anvil`. Dates are UTC; 0.1.0 and 0.1.1 are
+the days npm published them. Anvil is 0.x, so a minor version can break things;
+items that can break an existing install are marked **Breaking**.
 
 ## 0.2.0 - 2026-10-07
 
@@ -18,8 +18,8 @@ Everything below is relative to 0.1.1.
   A short secret can be guessed offline from one captured signed request.
 - The idempotency key is `sha256("sha256=" + canonical signature hex + raw body)`,
   where the signature is first reduced to 64 lower-case hex digits. Keys for the
-  lower-case signatures providers send are unchanged, so dedupe holds across the
-  upgrade. `computeIdempotencyKey` now throws on a header `verify` would reject.
+  lower-case signatures providers send are the same as before. The internal
+  `computeIdempotencyKey` now throws on a header `verify` would reject.
 - Dedupe is one atomic `SET anvil:dedupe:<key> <token> NX EX <ttl>`. The first
   delivery claims the key and enqueues; later ones return `replayed: true`
   without touching the queue.
@@ -31,7 +31,8 @@ Everything below is relative to 0.1.1.
   compare-and-delete on the claim's own token), so the provider's retry is not
   answered `replayed: true` with nothing queued.
 - `POST /webhooks` answers `503` when the queue cannot take the job (Redis down,
-  not ready, or a command timed out). Before, the rejection went unhandled.
+  not ready, or a command timed out). Before, the rejection went unhandled and
+  could take the process down.
 - Redis commands on the server fail at once while disconnected instead of
   queueing (`enableOfflineQueue: false`), with 5 s connect and command timeouts.
   A server started before Redis is reachable builds its queue only once the
@@ -78,8 +79,9 @@ Everything below is relative to 0.1.1.
   `verify` accepted both and the key hashed the header text as received.
 - An error thrown while dead-lettering no longer becomes an unhandled rejection
   inside the worker's `failed` listener; it is logged and the worker carries on.
-- Oversized or malformed requests no longer get Express's default error page
-  with a stack trace; they get fixed JSON bodies (`413`, `400`, or `500`).
+- Oversized or malformed requests no longer get Express's default error page,
+  which includes a stack trace outside production; they get fixed JSON bodies
+  (`413`, `400`, or `500`).
 - Production `pnpm audit` is clean again: patched `proxy-addr`, `qs` and
   `body-parser` are pinned in the workspace root. The published package's
   dependency ranges are unchanged.
