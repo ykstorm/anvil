@@ -11,9 +11,8 @@ resource "hcloud_server" "redis" {
   ssh_keys    = [hcloud_ssh_key.anvil.id]
 
   user_data = templatefile("${path.module}/templates/redis-cloud-init.yaml.tftpl", {
-    redis_bind_ip  = var.redis_private_ip
-    maxmemory_mb   = var.redis_maxmemory_mb
-    redis_password = var.redis_password
+    redis_bind_ip = var.redis_private_ip
+    maxmemory_mb  = var.redis_maxmemory_mb
   })
 
   network {

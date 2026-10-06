@@ -6,6 +6,8 @@ packages:
   - gnupg
 
 write_files:
+  # REDIS_URL has no password: user_data is readable, so the operator adds the
+  # password after boot (see the module README) and restarts anvil-worker.
   - path: /etc/anvil/worker.env
     permissions: "0600"
     content: |

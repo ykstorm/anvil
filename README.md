@@ -165,8 +165,8 @@ scaffolds and provision only what Anvil uses; there is no database.
 
 - **Hetzner Cloud (Terraform):** [infra/terraform/](./infra/terraform/) brings
   up a Redis VM, the webhook server, and a worker pool sized by `worker_count`.
-  `WEBHOOK_SECRET` is not templated into cloud-init (user_data is readable);
-  provision it on the VM after boot. SSH is closed unless you set
+  Neither `WEBHOOK_SECRET` nor the Redis password is templated into cloud-init
+  (user_data is readable); provision both on the VMs after boot. SSH is closed unless you set
   `ssh_allowed_cidrs`. See the README there.
 - **Kubernetes (Helm):** [charts/anvil/](./charts/anvil/) deploys the server
   (Deployment + Service + Ingress on `/webhooks`), the worker, and an in-cluster
