@@ -62,6 +62,17 @@ describe("createServer HTTP (no Redis needed)", () => {
     expect(res.status).toBe(401);
   });
 
+  it("rejects a valid signature with an extra hex digit with 401", async () => {
+    const url = await start({ secret: TEST_SECRET });
+    const body = '{"a":1}';
+    const res = await fetch(`${url}/webhooks`, {
+      method: "POST",
+      headers: { "x-signature": signBody(body) + "0" },
+      body,
+    });
+    expect(res.status).toBe(401);
+  });
+
   it("rejects an over-limit body with 413", async () => {
     const url = await start({ secret: TEST_SECRET, maxBodyBytes: 100 });
     const body = "x".repeat(500);

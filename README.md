@@ -25,8 +25,11 @@ separate, manual step so a broken handler cannot loop.
 
 Each of these has a test, and each is the reason a line of code exists.
 
-- **One job per delivery.** The idempotency key is `sha256(signature header +
-  raw body)`. The first delivery claims the key with an atomic
+- **One job per delivery.** The idempotency key is `sha256(signature + raw
+  body)`, where the signature is first reduced to one canonical form
+  (`sha256=` and 64 lower-case hex digits), so different spellings of one valid
+  signature cannot make different keys. The first delivery claims the key with
+  an atomic
   `SET key <token> NX EX <ttl>` and enqueues one job; later deliveries of the
   same key find it already set and return `replayed: true` without enqueuing
   again. Two concurrent copies of the same delivery still yield exactly one job.
@@ -36,7 +39,8 @@ Each of these has a test, and each is the reason a line of code exists.
 - **Constant-time signature check.** `verify(body, sigHeader, secret)` recomputes
   the HMAC-SHA256 over the raw bytes and compares with `crypto.timingSafeEqual`
   after a length check, so the compare never throws and leaks no length oracle.
-  An empty secret, a malformed header, or a length mismatch is a plain `false`.
+  An empty secret, a malformed header, or a digest that is not exactly 64 hex
+  digits is a plain `false`.
 - **Fixed retry backoff.** A failing handler retries after 1s, 5s and 30s;
   after the fourth failure the job moves to the dead-letter queue,
   `webhooks.dead`, with `failureContext: { attempts, lastError }`, where
@@ -172,9 +176,9 @@ helm install anvil ./charts/anvil \
 This is 0.1. It is honest about what it is not yet.
 
 - No container image is published. Build your own from the Dockerfiles.
-- The idempotency key includes the signature header, so an exact re-delivery
-  (same signature and body) dedupes, but a provider that rotates the signature
-  on re-delivery produces a different key. Dedupe on a stable provider event id
+- The idempotency key includes the signature, so an exact re-delivery (same
+  signature and body) dedupes, but a provider that rotates the signature on
+  re-delivery (a new secret, for example) produces a different key. Dedupe on a stable provider event id
   is out of scope.
 - The HMAC covers the body only. A captured request with a valid signature can
   be replayed; enforce a timestamp window in your handler if your provider signs

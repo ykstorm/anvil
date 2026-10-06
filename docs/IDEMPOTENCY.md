@@ -1,6 +1,13 @@
 # Idempotency
 
-The idempotency key is `sha256(signature_header + raw_payload_bytes)`. On the
+The idempotency key is `sha256(canonical_signature + raw_payload_bytes)`. The
+canonical signature is `sha256=` followed by the 64 hex digits of the digest in
+lower case; `verify` accepts only exactly 64 hex digits, in either case, and the
+key is built from the lower-cased form. Without that, one valid signature could
+be written several ways (upper case, or with an extra trailing digit that hex
+decoding drops), each passing `verify` and each making a new key, so a captured
+request could be processed again. For the lower-case hex providers send, the
+key is the same as hashing the header as received. On the
 first delivery of a key the server claims it atomically with
 `SET anvil:dedupe:<key> <token> NX EX <ttl>` on Redis and enqueues one BullMQ
 job under that key as the jobId. Every later delivery of the same key finds it
@@ -19,7 +26,7 @@ the dedupe set uses. A re-delivery after the window has passed is treated as new
 
 ## What this does and does not dedupe
 
-The key folds in both the signature header and the raw body, so:
+The key folds in both the canonical signature and the raw body, so:
 
 - An exact re-delivery, the same signed request, byte for byte, collapses to one
   job. This is the common provider retry and the case Anvil guarantees.

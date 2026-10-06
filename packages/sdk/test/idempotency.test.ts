@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 import { Queue } from "bullmq";
 import IORedis, { type Redis } from "ioredis";
 import { computeIdempotencyKey } from "../src/internal/idempotency.js";
@@ -9,7 +10,7 @@ import { REDIS_URL, nonce, signBody, uniqueQueueName } from "./helpers.js";
  * computeIdempotencyKey is pure, so its assertions run everywhere. The atomic
  * dedupe assertions need a real Redis (SET NX + BullMQ), so they are gated.
  */
-describe("idempotency key = sha256(signature_header + raw_payload_bytes)", () => {
+describe("idempotency key = sha256(canonical signature + raw_payload_bytes)", () => {
   it("produces the same key for the same signature + body", () => {
     const body = '{"id":"evt_1"}';
     const sig = signBody(body);
@@ -19,15 +20,42 @@ describe("idempotency key = sha256(signature_header + raw_payload_bytes)", () =>
   });
 
   it("produces different keys for the same signature but different body", () => {
-    const sig = "sha256=deadbeef";
+    const sig = signBody("shared");
     const a = computeIdempotencyKey(sig, Buffer.from('{"id":"a"}'));
     const b = computeIdempotencyKey(sig, Buffer.from('{"id":"b"}'));
     expect(a).not.toBe(b);
   });
 
   it("produces a 64-char hex sha256 digest", () => {
-    const key = computeIdempotencyKey("sha256=x", Buffer.from("body"));
+    const key = computeIdempotencyKey(signBody("body"), Buffer.from("body"));
     expect(key).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("gives one key for every spelling of a signature that verify accepts", () => {
+    const body = '{"id":"evt_case"}';
+    const sig = signBody(body);
+    const upper = "sha256=" + sig.slice("sha256=".length).toUpperCase();
+    expect(computeIdempotencyKey(upper, Buffer.from(body))).toBe(
+      computeIdempotencyKey(sig, Buffer.from(body)),
+    );
+  });
+
+  it("keeps the key of a lower-case signature equal to sha256(header + body)", () => {
+    // Providers send lower-case hex; those keys match the ones older releases made.
+    const body = '{"id":"evt_compat"}';
+    const sig = signBody(body);
+    const old = createHash("sha256").update(sig, "utf8").update(body).digest("hex");
+    expect(computeIdempotencyKey(sig, Buffer.from(body))).toBe(old);
+  });
+
+  it("refuses a header that is not sha256=<64 hex>", () => {
+    const body = '{"id":"evt_bad"}';
+    expect(() => computeIdempotencyKey(signBody(body) + "0", Buffer.from(body))).toThrow(
+      TypeError,
+    );
+    expect(() => computeIdempotencyKey("sha256=deadbeef", Buffer.from(body))).toThrow(
+      TypeError,
+    );
   });
 });
 

@@ -43,8 +43,9 @@ await worker.start();
 ```
 
 An exact re-delivery (same signature and body) enqueues **exactly one** job,
-even under concurrency: the key is `sha256(signatureHeader + rawBody)`, claimed
-atomically with `SET ... NX EX`. A provider that rotates the signature on
+even under concurrency: the key is `sha256(signature + rawBody)`, with the
+signature in its canonical lower-case form, claimed atomically with
+`SET ... NX EX`. A provider that rotates the signature on
 re-delivery produces a different key, so that case is not deduped; see the repo
 idempotency notes.
 
