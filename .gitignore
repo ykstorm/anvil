@@ -13,3 +13,8 @@ coverage/
 *.tfstate.*
 *.tfvars
 crash.log
+
+# Bench reports are written by every run; commit one only next to a quoted figure.
+bench/report-latest.md
+bench/report-latest.json
+bench/*.txt

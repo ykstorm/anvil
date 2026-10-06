@@ -133,20 +133,22 @@ a prebuilt image; build your own from these Dockerfiles.
 
 ## Performance
 
-The committed numbers come from one local run of `node bench/throughput.mjs` on
-Node 24, recorded in [bench/report-latest.md](./bench/report-latest.md):
+No throughput figure is quoted here. The one this README used to carry was
+measured before the dedupe moved to `SET NX`, so it described older code. Measure
+on your own machine instead:
 
-| Metric | Value |
-|---|---|
-| Ingress throughput | ~8,800 req/s |
-| Ingress latency p50 / p99 | 5 ms / 13 ms |
+```bash
+pnpm -r build
+node bench/throughput.mjs
+```
 
 That bench drives the real verify, idempotency key, dedupe-enqueue path with an
 **in-memory queue stub** (no Redis, no worker), so it isolates Anvil's own cost,
-not Redis'. It is one machine, one run: your numbers will differ. CI runs the
-benchmark on every push and attaches the output as an artifact
-([benchmark.yml](.github/workflows/benchmark.yml)); it does not commit numbers
-back here.
+not Redis'. Its report records the date, machine and Node version of the run. A
+figure will only come back here together with the committed report it came from.
+CI runs the benchmark on pushes and pull requests that touch `bench/`,
+`packages/` or `apps/` and attaches the output as an artifact
+([benchmark.yml](.github/workflows/benchmark.yml)); a crash fails the job.
 
 `node bench/verify.mjs` reports per-verify cost and the timing delta between a
 valid signature and a same-length forgery. A small delta is the evidence for the

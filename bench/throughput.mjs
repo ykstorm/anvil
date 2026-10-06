@@ -6,6 +6,7 @@
 import { createServer as createHttp } from 'node:http'
 import { createHmac } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
+import { cpus, platform, release } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import autocannon from 'autocannon'
@@ -20,14 +21,26 @@ const DURATION = Number(process.env.BENCH_DURATION ?? 10)
 const CONNECTIONS = Number(process.env.BENCH_CONNECTIONS ?? 50)
 const UNIQUE = Number(process.env.BENCH_UNIQUE ?? 200)
 
-// In-memory stand-in for a BullMQ Queue. enqueueWebhook only calls getJob/add,
-// and a duplicate jobId is a no-op add, that is Anvil's dedupe contract.
+// In-memory stand-in for a BullMQ Queue. enqueueWebhook claims the key with
+// SET NX EX on queue.client, adds the job with queue.add, and gives the claim
+// back with EVAL if the add fails; the stub implements exactly those calls.
 function mockQueue() {
+  const claims = new Map()
   const jobs = new Map()
-  return {
-    async getJob(id) {
-      return jobs.get(id)
+  const client = {
+    async set(key, value) {
+      if (claims.has(key)) return null
+      claims.set(key, value)
+      return 'OK'
     },
+    async eval(_script, _numKeys, key, token) {
+      if (claims.get(key) !== token) return 0
+      claims.delete(key)
+      return 1
+    },
+  }
+  return {
+    client: Promise.resolve(client),
     async add(name, data, opts) {
       const id = opts.jobId
       const existing = jobs.get(id)
@@ -60,7 +73,11 @@ const server = createHttp((req, res) => {
       return res.end('{"error":"invalid signature"}')
     }
     const key = computeIdempotencyKey(sig, raw)
-    const result = await enqueueWebhook(queue, key, { body: raw.toString('utf8'), sig })
+    const result = await enqueueWebhook(queue, key, {
+      body: raw.toString('utf8'),
+      sig,
+      receivedAt: new Date().toISOString(),
+    })
     if (result.replayed) counters.replayed++
     else counters.accepted++
     res.statusCode = 202
@@ -116,7 +133,10 @@ const result = await autocannon({
 server.close()
 
 const L = result.latency
+const cpu = cpus()
 const summary = {
+  date: new Date().toISOString(),
+  machine: `${cpu[0]?.model.trim() ?? 'unknown cpu'} x${cpu.length}, ${platform()} ${release()}`,
   node: process.version,
   duration_s: DURATION,
   connections: CONNECTIONS,
@@ -155,6 +175,8 @@ exercises the real verify -> idempotency -> dedupe-enqueue path.
 | Retry rate | n/a (worker-side) |
 | Dead-letter rate | n/a (worker-side) |
 | Node | ${process.version} |
+| Date | ${summary.date} |
+| Machine | ${summary.machine} |
 
 Retry and dead-letter rates are worker-side outcomes; an ingress throughput
 bench runs no worker, so they are reported as n/a rather than fabricated.
