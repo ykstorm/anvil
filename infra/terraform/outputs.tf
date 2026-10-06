@@ -14,9 +14,18 @@ output "redis_private_ip" {
 }
 
 output "redis_url" {
-  description = "Internal REDIS_URL handed to the app VMs. Carries the Redis password when one is set."
+  description = "Internal REDIS_URL handed to the app VMs, without the password, which the operator adds after boot."
   value       = local.redis_url
-  sensitive   = true
+}
+
+output "redis_public_ip" {
+  description = "Public IPv4 of the Redis VM, for the operator's SSH step that writes the Redis password. Redis itself listens on the private IP only."
+  value       = hcloud_server.redis.ipv4_address
+}
+
+output "worker_public_ips" {
+  description = "Public IPv4 of each worker VM, for the operator's SSH step that adds the Redis password to REDIS_URL."
+  value       = hcloud_server.worker[*].ipv4_address
 }
 
 output "worker_private_ips" {

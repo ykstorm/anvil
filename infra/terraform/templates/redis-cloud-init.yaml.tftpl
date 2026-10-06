@@ -4,23 +4,29 @@ packages:
   - redis-server
 
 write_files:
+  # defer: written after the package is installed, so the package's first
+  # start uses its stock config, which listens on localhost only, and the
+  # redis user exists for the owner below.
   - path: /etc/redis/redis.conf
     owner: redis:redis
     permissions: "0640"
+    defer: true
     content: |
       # Managed by Terraform (Anvil infra). Do not edit by hand.
       bind 127.0.0.1 ${redis_bind_ip}
       protected-mode yes
       port 6379
-%{ if redis_password != "" ~}
-      requirepass ${redis_password}
-%{ endif ~}
       maxmemory ${maxmemory_mb}mb
       maxmemory-policy noeviction
       appendonly yes
       appendfsync everysec
       dir /var/lib/redis
+      # requirepass is not in user_data, which is readable from the metadata
+      # service and the provider console. The operator writes it to this file
+      # after boot (see the module README); Redis refuses to start without it.
+      include /etc/redis/anvil-auth.conf
 
 runcmd:
-  - systemctl enable redis-server
-  - systemctl restart redis-server
+  # Redis stays stopped and disabled until the operator has written
+  # /etc/redis/anvil-auth.conf and runs: systemctl enable --now redis-server
+  - systemctl disable --now redis-server

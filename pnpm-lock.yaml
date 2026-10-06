@@ -56,6 +56,26 @@ importers:
         specifier: ^5.34.5
         version: 5.78.1
 
+  examples/github:
+    dependencies:
+      '@ykstormsorg/anvil':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      '@types/node':
+        specifier: ^20.17.10
+        version: 20.19.43
+
+  examples/stripe:
+    dependencies:
+      '@ykstormsorg/anvil':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      '@types/node':
+        specifier: ^20.17.10
+        version: 20.19.43
+
   packages/sdk:
     dependencies:
       bullmq:

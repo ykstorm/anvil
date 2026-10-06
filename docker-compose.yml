@@ -20,7 +20,9 @@ services:
         condition: service_healthy
     environment:
       REDIS_URL: redis://redis:6379
-      WEBHOOK_SECRET: whsec_dev
+      # Local development only; this value is public. createServer refuses a
+      # secret shorter than 16 characters, so the server would exit at start.
+      WEBHOOK_SECRET: whsec_dev_only_not_a_real_secret
     ports:
       - "3000:3000"
 

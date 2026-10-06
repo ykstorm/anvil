@@ -13,6 +13,8 @@ write_files:
   #   ssh root@<server> 'echo WEBHOOK_SECRET=whsec_... >> /etc/anvil/server.env \
   #     && systemctl restart anvil-server'
   # The unit stays in a restart loop until the secret is present.
+  # REDIS_URL below has no password for the same reason; the operator adds it
+  # after boot (see the module README).
   - path: /etc/anvil/server.env
     permissions: "0600"
     content: |

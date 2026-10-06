@@ -7,8 +7,9 @@
  * adaptation (unlike the Stripe example, whose `t=,v1=` header needs
  * reformatting first). Just point `signatureHeader` at it.
  *
- * Run with: WEBHOOK_SECRET=<gh webhook secret> REDIS_URL=redis://localhost:6379 \
- *   node --experimental-strip-types examples/github/server.ts
+ * Run from the repo root after `pnpm install && pnpm -r build`:
+ *   WEBHOOK_SECRET=<gh webhook secret> REDIS_URL=redis://localhost:6379 \
+ *     pnpm --filter @anvil/example-github run server
  */
 import { createServer } from "@ykstormsorg/anvil";
 

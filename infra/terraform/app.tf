@@ -1,8 +1,8 @@
 locals {
-  # Every app VM talks to Redis over the private network. When a password is
-  # set, it is folded into the URL (url-encoded) so the app authenticates.
-  redis_auth = var.redis_password != "" ? ":${urlencode(var.redis_password)}@" : ""
-  redis_url  = "redis://${local.redis_auth}${var.redis_private_ip}:6379"
+  # Every app VM talks to Redis over the private network. The password is not
+  # part of this URL, because the URL is written through user_data; the
+  # operator adds it to the env files after boot (see the module README).
+  redis_url = "redis://${var.redis_private_ip}:6379"
 }
 
 # --- Anvil webhook server ---

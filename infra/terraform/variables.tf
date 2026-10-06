@@ -77,12 +77,12 @@ variable "redis_maxmemory_mb" {
   default     = 2048
 }
 
-variable "redis_password" {
-  description = "Password for Redis (requirepass). When set it is enforced on the Redis VM and folded into REDIS_URL for the app VMs. Empty disables auth; set a value for anything beyond a throwaway stack. Pass it from a secret store, do not commit it."
-  type        = string
-  default     = ""
-  sensitive   = true
-}
+# The Redis password is deliberately NOT a Terraform variable, for the same
+# reason as WEBHOOK_SECRET below: cloud-init user_data is readable from the
+# instance metadata service and the provider console, and it used to carry the
+# password twice (requirepass on the Redis VM, REDIS_URL on every app VM). Redis
+# stays stopped until the operator writes the password on the Redis VM after
+# boot, and REDIS_URL on the app VMs gets it the same way. See the module README.
 
 # --- App: server ---
 

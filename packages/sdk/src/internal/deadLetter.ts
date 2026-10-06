@@ -2,8 +2,10 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import type { Job } from "bullmq";
 import { RETRY_JOB_OPTIONS } from "./retry.js";
+import { DEFAULT_QUEUE_NAME, deadQueueName, resolveRedisUrl } from "./defaults.js";
 
-export const DEAD_QUEUE_NAME = "webhooks.dead";
+/** The dead queue for the default main queue: "webhooks.dead". */
+export const DEAD_QUEUE_NAME = deadQueueName(DEFAULT_QUEUE_NAME);
 
 /** Cap on a stored error message, so one huge error cannot bloat Redis. */
 const MAX_ERROR_LENGTH = 2048;
@@ -80,23 +82,22 @@ interface OpenedQueues {
  * can close exactly what it created.
  */
 function openReplayQueues(deps: ReplayDeps): OpenedQueues {
+  const mainName = deps.mainQueueName ?? DEFAULT_QUEUE_NAME;
   if (deps.mainQueue || deps.deadQueue) {
-    const mainName = deps.mainQueueName ?? "webhooks";
     return {
       mainQueue: deps.mainQueue ?? new Queue(mainName, { connection: new IORedis() }),
-      deadQueue: deps.deadQueue ?? new Queue(`${mainName}.dead`, { connection: new IORedis() }),
+      deadQueue:
+        deps.deadQueue ?? new Queue(deadQueueName(mainName), { connection: new IORedis() }),
       ownConnection: null,
     };
   }
 
-  const ownConnection = new IORedis(
-    deps.redisUrl ?? process.env.REDIS_URL ?? "redis://localhost:6379",
-    { maxRetriesPerRequest: null },
-  );
-  const mainName = deps.mainQueueName ?? "webhooks";
+  const ownConnection = new IORedis(resolveRedisUrl(deps.redisUrl), {
+    maxRetriesPerRequest: null,
+  });
   return {
     mainQueue: new Queue(mainName, { connection: ownConnection }),
-    deadQueue: new Queue(`${mainName}.dead`, { connection: ownConnection }),
+    deadQueue: new Queue(deadQueueName(mainName), { connection: ownConnection }),
     ownConnection,
   };
 }

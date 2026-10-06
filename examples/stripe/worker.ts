@@ -2,8 +2,8 @@
  * Example: an Anvil worker that handles Stripe events. Example code, not
  * production config.
  *
- * Run with: REDIS_URL=redis://localhost:6379 \
- *   node --experimental-strip-types examples/stripe/worker.ts
+ * Run from the repo root after `pnpm install && pnpm -r build`:
+ *   REDIS_URL=redis://localhost:6379 pnpm --filter @anvil/example-stripe run worker
  */
 import { createWorker } from "@ykstormsorg/anvil";
 

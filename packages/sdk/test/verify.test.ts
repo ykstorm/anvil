@@ -42,6 +42,26 @@ describe("verify (HMAC-SHA256, constant-time)", () => {
     expect(verify("{}", "sha256=abcd", secret)).toBe(false);
   });
 
+  it("rejects a valid signature with one extra hex digit", () => {
+    // Buffer.from(hex) drops a trailing odd digit, so this decodes to the right
+    // 32 bytes; the length check has to happen on the text.
+    const body = '{"amount":100}';
+    expect(verify(body, sign(body) + "0", secret)).toBe(false);
+  });
+
+  it("rejects a hex digest that is not exactly 64 characters", () => {
+    const body = '{"amount":100}';
+    const hex = sign(body).slice("sha256=".length);
+    expect(verify(body, "sha256=" + hex.slice(0, 63), secret)).toBe(false);
+    expect(verify(body, "sha256=" + hex + hex, secret)).toBe(false);
+  });
+
+  it("accepts the same signature written in upper-case hex", () => {
+    const body = '{"amount":100}';
+    const hex = sign(body).slice("sha256=".length);
+    expect(verify(body, "sha256=" + hex.toUpperCase(), secret)).toBe(true);
+  });
+
   it("accepts an empty body when correctly signed", () => {
     expect(verify("", sign(""), secret)).toBe(true);
   });

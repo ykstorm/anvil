@@ -3,8 +3,9 @@
  * production config. It shows the wiring; adapt secrets and the route to your
  * setup.
  *
- * Run with: WEBHOOK_SECRET=whsec_... REDIS_URL=redis://localhost:6379 \
- *   node --experimental-strip-types examples/stripe/server.ts
+ * Run from the repo root after `pnpm install && pnpm -r build`:
+ *   WEBHOOK_SECRET=<at least 16 characters> REDIS_URL=redis://localhost:6379 \
+ *     pnpm --filter @anvil/example-stripe run server
  */
 import { createServer } from "@ykstormsorg/anvil";
 

@@ -20,7 +20,7 @@ timed(validSig) // warm
 const v = timed(validSig), w = timed(wrong)
 const perValid = v.ns / N / 1000, perWrong = w.ns / N / 1000
 console.log(`body_bytes=${body.length} iterations=${N}`)
-console.log(`valid:   ${perValid.toFixed(3)} us/verify  (${(1e6/(v.ns/N)).toFixed(0)} verifies/sec)  matched=${v.ok}`)
+console.log(`valid:   ${perValid.toFixed(3)} us/verify  (${(1e9/(v.ns/N)).toFixed(0)} verifies/sec)  matched=${v.ok}`)
 console.log(`invalid: ${perWrong.toFixed(3)} us/verify  (same-length wrong sig)  matched=${w.ok}`)
 console.log(`timing_delta=${(Math.abs(perValid-perWrong)/perValid*100).toFixed(1)}%  (small = constant-time compare holds)`)
 console.log(`node=${process.version}`)
