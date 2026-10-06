@@ -108,8 +108,11 @@ again and `replayed` is `true` with the same `jobId`; the worker still runs the
 job once.
 
 The secret must be at least 16 characters; `createServer` throws on a shorter
-one. The server also exposes `/healthz` (liveness) and `/readyz` (readiness,
-which pings Redis).
+one. The server also exposes `/healthz` (liveness: the process is up) and
+`/readyz` (readiness: 200 once Redis answers a PING, 503 until then). A server
+started before Redis is reachable answers 503 on `/readyz` and `/webhooks`
+while the client keeps reconnecting, and starts accepting on its own once
+Redis is back.
 
 ## Docker
 
@@ -193,6 +196,10 @@ This is 0.1. It is honest about what it is not yet.
   dead queue, but a worker that dies in the middle of the move leaves the job in
   the main queue's failed list, which is trimmed after the dedupe TTL. See
   [docs/DEAD_LETTER.md](./docs/DEAD_LETTER.md).
+- The worker does not have the server's Redis-down-at-start recovery yet. BullMQ
+  keeps a worker's first connection attempt the same way it does a queue's, so
+  a worker started before Redis is reachable may process nothing until it is
+  restarted. Start workers after Redis, or restart them once it is up.
 - One Redis, one region. Multi-region delivery and cross-region dedupe are out
   of scope.
 

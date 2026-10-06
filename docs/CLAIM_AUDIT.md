@@ -16,6 +16,7 @@ Redis-backed integration assertions run in CI against a `redis:7` service.
 | A replayed job still follows the backoff schedule + re-dead-letters | replay re-adds with the schedule | `packages/sdk/test/replay-schedule.test.ts` (Redis-gated) |
 | The worker dead-letters to `<queueName>.dead`, the queue replay reads, including jobs BullMQ fails as unrecoverable (stalled past `maxStalledCount`) | `packages/sdk/src/createWorker.ts`, `deadQueueName()` in `packages/sdk/src/internal/defaults.ts` | `packages/sdk/test/createWorker.test.ts` (stubbed BullMQ) + `worker.e2e.test.ts` (Redis-gated) |
 | HTTP ingress: 202 + jobId, duplicate `replayed: true`, 401 on bad/missing signature, 413 over limit, 503 on enqueue failure | `packages/sdk/src/createServer.ts` | `packages/sdk/test/createServer.test.ts` + `createServer.enqueueFail.test.ts` |
+| Started while Redis is down: `/readyz` and `/webhooks` answer 503, and the server recovers when Redis returns | `packages/sdk/src/createServer.ts`, the queue is built once the connection is ready | `packages/sdk/test/createServer.redisDown.test.ts` (stubbed ioredis + BullMQ) |
 | Small SDK surface, exactly `createServer`, `createWorker`, `replayDeadLetter` | `packages/sdk/src/index.ts` | `packages/sdk/test/sdk.test.ts` |
 | Ships a Terraform module | `infra/terraform/*.tf` | `terraform validate` + `fmt` (infra.yml) |
 | Ships a Helm chart | `charts/anvil/` | `helm lint` + `helm template \| kubeconform` (infra.yml) |

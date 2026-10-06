@@ -36,7 +36,7 @@ const READYZ_TIMEOUT_MS = 1000;
  * crashing the process.
  */
 function makeWebhookHandler(
-  queue: Queue,
+  getQueue: () => Promise<Queue>,
   opts: { secret: string; headerName: string; dedupeTtlSeconds?: number },
 ): RequestHandler {
   return async (req: Request, res: Response) => {
@@ -50,6 +50,7 @@ function makeWebhookHandler(
 
     const key = computeIdempotencyKey(sig, raw);
     try {
+      const queue = await getQueue();
       const result = await enqueueWebhook(
         queue,
         key,
@@ -58,10 +59,60 @@ function makeWebhookHandler(
       );
       res.status(202).json(result);
     } catch {
-      // Redis unreachable, command timed out, etc. Shed load; do not crash.
+      // Redis unreachable or not ready yet, command timed out, etc. Shed load;
+      // do not crash.
       res.status(503).json({ error: "service unavailable" });
     }
   };
+}
+
+/**
+ * Hands out the BullMQ queue, building it only once the Redis connection is
+ * ready.
+ *
+ * A BullMQ Queue makes one attempt to initialise its connection when it is
+ * constructed and keeps that promise (queue.client) for its whole life. Built
+ * while Redis is unreachable, the promise stays rejected after ioredis has
+ * reconnected, and the queue never works again. So nothing builds the queue
+ * until the connection reports ready, and a queue whose initialisation still
+ * failed is dropped and rebuilt on the next call. While the connection is not
+ * ready this fails at once, which the callers turn into 503.
+ */
+function makeQueueSource(queueName: string, connection: Redis): () => Promise<Queue> {
+  let queue: Queue | undefined;
+  return async () => {
+    if (connection.status !== "ready") {
+      throw new Error(`redis not ready (${connection.status})`);
+    }
+    if (!queue) {
+      queue = new Queue(queueName, { connection });
+      // BullMQ re-emits connection errors on the queue; the connection's own
+      // listener in createServer already reports them.
+      queue.on("error", () => {});
+    }
+    const current = queue;
+    try {
+      await current.client;
+      return current;
+    } catch (err) {
+      if (queue === current) queue = undefined;
+      void current.close().catch(() => {});
+      throw err;
+    }
+  };
+}
+
+/** Reject after `ms` unless `work` settles first. */
+async function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error("deadline exceeded")), ms);
+  });
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Cap concurrent in-flight requests; excess gets 429 before the body is read. */
@@ -109,7 +160,8 @@ function makeRateLimiter(windowMs: number, max: number): RequestHandler {
 
 /**
  * Build the Anvil webhook ingress app. Verifies the HMAC over the raw body,
- * dedupes by sha256(signature + payload), enqueues to BullMQ, returns 202.
+ * dedupes by sha256(canonical signature + payload), enqueues to BullMQ,
+ * returns 202.
  */
 export function createServer(opts: ServerOptions): Express {
   const {
@@ -128,14 +180,28 @@ export function createServer(opts: ServerOptions): Express {
     );
   }
 
+  // Connects now and, with the default retryStrategy, keeps reconnecting for
+  // as long as Redis is away; nothing here may turn that off, because the
+  // server only recovers from an outage through it. enableOfflineQueue: false
+  // makes commands fail at once while disconnected instead of piling up.
   const connection = new IORedis(resolveRedisUrl(opts.redisUrl), {
     maxRetriesPerRequest: null,
-    lazyConnect: true,
     enableOfflineQueue: false,
     connectTimeout: 5000,
     commandTimeout: 5000,
   });
-  const queue = new Queue(queueName, { connection });
+  // One line per outage rather than one stack trace per reconnect attempt.
+  let outageLogged = false;
+  connection.on("error", (err: Error) => {
+    if (!outageLogged) {
+      outageLogged = true;
+      console.error(`anvil: redis connection error: ${err.message}`);
+    }
+  });
+  connection.on("ready", () => {
+    outageLogged = false;
+  });
+  const getQueue = makeQueueSource(queueName, connection);
 
   const headerName = signatureHeader.toLowerCase();
 
@@ -148,7 +214,7 @@ export function createServer(opts: ServerOptions): Express {
   }
   chain.push(
     express.raw({ type: "*/*", limit: maxBodyBytes, inflate: false }),
-    makeWebhookHandler(queue, { secret, headerName, dedupeTtlSeconds }),
+    makeWebhookHandler(getQueue, { secret, headerName, dedupeTtlSeconds }),
   );
 
   app.post("/webhooks", ...chain);
@@ -156,21 +222,19 @@ export function createServer(opts: ServerOptions): Express {
   // Liveness: the process is up.
   app.get("/healthz", (_req, res) => res.status(200).json({ ok: true }));
 
-  // Readiness: can we actually reach Redis? Ping with a short deadline so a
-  // stalled connection reports 503 instead of hanging the probe.
+  // Readiness: 200 only when the queue is usable and Redis answers a PING
+  // now. 503 until then, including when the server started before Redis was
+  // reachable. The deadline covers the whole step, so a connection that never
+  // comes up still gets an answer within a second.
   app.get("/readyz", async (_req, res) => {
     try {
-      // Race the whole acquire-then-ping, not just the ping: a connection that
-      // never establishes must still answer within the deadline.
-      await Promise.race([
+      await withDeadline(
         (async () => {
-          const client = (await queue.client) as unknown as Redis;
-          return client.ping();
+          await getQueue();
+          await connection.ping();
         })(),
-        new Promise((_resolve, reject) =>
-          setTimeout(() => reject(new Error("readyz timeout")), READYZ_TIMEOUT_MS),
-        ),
-      ]);
+        READYZ_TIMEOUT_MS,
+      );
       res.status(200).json({ ready: true });
     } catch {
       res.status(503).json({ ready: false });

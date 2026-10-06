@@ -4,7 +4,7 @@ import { Queue } from "bullmq";
 import IORedis, { type Redis } from "ioredis";
 import { createServer } from "../src/createServer.js";
 import { computeIdempotencyKey } from "../src/internal/idempotency.js";
-import { REDIS_URL, TEST_SECRET, nonce, signBody, uniqueQueueName } from "./helpers.js";
+import { REDIS_URL, TEST_SECRET, nonce, signBody, uniqueQueueName, waitFor } from "./helpers.js";
 
 /** Start an app on an ephemeral port and return its base URL + closer. */
 async function listen(app: ReturnType<typeof createServer>): Promise<{
@@ -126,6 +126,9 @@ gated("createServer HTTP (Redis-gated)", () => {
     ({ url, close } = await listen(
       createServer({ secret: TEST_SECRET, redisUrl: REDIS_URL, queueName }),
     ));
+    // Requests before the Redis connection is ready get 503, as a readiness
+    // probe would keep traffic away; wait the way Kubernetes does.
+    await waitFor(async () => (await fetch(`${url}/readyz`)).status === 200);
   });
 
   afterAll(async () => {
