@@ -8,22 +8,27 @@ default `x-signature` header so the focus stays on the pipeline.
 
 ## Run it
 
-You need Redis on `localhost:6379` and Node 20+.
+You need Redis on `localhost:6379`, Node 20+ and pnpm. The example is a
+workspace package (`@anvil/example-stripe`) that depends on the SDK in this
+repo, so run everything from the repo root:
 
 ```bash
 docker run -p 6379:6379 redis:7
 
-# build the SDK first
+# install the workspace and build the SDK and the examples to dist/
+pnpm install
 pnpm -r build
 
 # worker
-REDIS_URL=redis://localhost:6379 \
-  node --experimental-strip-types examples/stripe/worker.ts
+REDIS_URL=redis://localhost:6379 pnpm --filter @anvil/example-stripe run worker
 
-# server
+# server (a public dev secret; createServer needs at least 16 characters)
 WEBHOOK_SECRET=whsec_dev_only_not_a_real_secret REDIS_URL=redis://localhost:6379 \
-  node --experimental-strip-types examples/stripe/server.ts
+  pnpm --filter @anvil/example-stripe run server
 ```
+
+After editing `server.ts` or `worker.ts`, rebuild with
+`pnpm --filter @anvil/example-stripe build`. CI type-checks both examples.
 
 Send a `charge.succeeded` event and watch the worker log it. Send an
 `invoice.payment_failed` event and watch the handler throw, retry on the

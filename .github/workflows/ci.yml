@@ -57,6 +57,11 @@ jobs:
 
       - run: pnpm -r typecheck
 
+      # The examples are workspace packages, so the step above already covers
+      # them; this names them so a broken example fails as its own step.
+      - name: Type-check the examples
+        run: pnpm --filter "./examples/*" typecheck
+
       - run: pnpm -r lint
 
       - run: pnpm -r test

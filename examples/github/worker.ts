@@ -2,8 +2,8 @@
  * Example: an Anvil worker that handles GitHub events. Example code, not
  * production config.
  *
- * Run with: REDIS_URL=redis://localhost:6379 \
- *   node --experimental-strip-types examples/github/worker.ts
+ * Run from the repo root after `pnpm install && pnpm -r build`:
+ *   REDIS_URL=redis://localhost:6379 pnpm --filter @anvil/example-github run worker
  */
 import { createWorker } from "@ykstormsorg/anvil";
 
@@ -20,8 +20,8 @@ const worker = createWorker(
     } else if (event.issue) {
       console.log("issue", event.action, "#" + event.issue?.number);
     } else {
-      // Throwing here puts the job on Anvil's retry schedule, then the
-      // dead-letter queue once the schedule is spent.
+      // Other event types are logged and completed. Throw instead to put the
+      // job on Anvil's retry schedule and, once it is spent, the dead queue.
       console.log("ignoring event", Object.keys(event).slice(0, 4).join(","));
     }
   },
