@@ -10,6 +10,7 @@ import IORedis, { type Redis } from "ioredis";
 import { verify } from "./internal/verify.js";
 import { computeIdempotencyKey } from "./internal/idempotency.js";
 import { enqueueWebhook } from "./internal/enqueue.js";
+import { DEFAULT_QUEUE_NAME, resolveRedisUrl } from "./internal/defaults.js";
 
 export interface ServerOptions {
   secret: string;
@@ -113,8 +114,7 @@ function makeRateLimiter(windowMs: number, max: number): RequestHandler {
 export function createServer(opts: ServerOptions): Express {
   const {
     secret,
-    redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379",
-    queueName = "webhooks",
+    queueName = DEFAULT_QUEUE_NAME,
     signatureHeader = "x-signature",
     maxBodyBytes = "256kb",
     maxInFlight = 1000,
@@ -128,7 +128,7 @@ export function createServer(opts: ServerOptions): Express {
     );
   }
 
-  const connection = new IORedis(redisUrl, {
+  const connection = new IORedis(resolveRedisUrl(opts.redisUrl), {
     maxRetriesPerRequest: null,
     lazyConnect: true,
     enableOfflineQueue: false,

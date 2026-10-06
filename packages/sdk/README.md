@@ -66,7 +66,7 @@ returns `202`. A duplicate returns the original job's id without enqueuing again
 ### `createWorker(handler, options?) to { start, close }`
 Runs `handler({ body, sig }, job)`. On a thrown error it retries after 1s, 5s
 and 30s; after the 4th failure the job moves to the dead-letter queue,
-`webhooks.dead`, with its failure context. The dead queue is written but never
+`<queueName>.dead` (`webhooks.dead` by default), with its failure context. The dead queue is written but never
 consumed here, replay is a separate process so a bad job can't drive a retry storm.
 
 ### `replayDeadLetter(jobId, options?) to { replayed, jobId }`

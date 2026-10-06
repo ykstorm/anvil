@@ -43,7 +43,8 @@ Each of these has a test, and each is the reason a line of code exists.
   digits is a plain `false`.
 - **Fixed retry backoff.** A failing handler retries after 1s, 5s and 30s;
   after the fourth failure the job moves to the dead-letter queue,
-  `webhooks.dead`, with `failureContext: { attempts, lastError }`, where
+  `<queueName>.dead` (`webhooks.dead` by default), with
+  `failureContext: { attempts, lastError }`, where
   `lastError` is truncated and has credential-looking query params redacted.
 - **Replay is a separate consumer.** `replayDeadLetter(jobId)` moves a dead job
   back to the main queue with a fresh retry schedule and returns

@@ -1,6 +1,9 @@
 # Dead-letter queue
 
-A job that fails its whole retry schedule lands on the `webhooks.dead` queue.
+A job that fails its whole retry schedule lands on the dead-letter queue,
+`<queueName>.dead`, which is `webhooks.dead` for the default queue. The worker
+and `replayDeadLetter` both derive that name from the main queue name, so pass
+the same `queueName` to `createWorker` and `mainQueueName` to replay.
 The dead job keeps the original payload and adds a `failureContext`:
 
 ```json
