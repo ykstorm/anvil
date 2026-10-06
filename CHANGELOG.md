@@ -2,7 +2,7 @@
 
 All notable changes to `@ykstormsorg/anvil`. Dates are UTC; 0.1.0 and 0.1.1 are
 the days npm published them. Anvil is 0.x, so a minor version can break things;
-items that can break an existing install are marked **Breaking**.
+items that can break an existing install are marked Breaking.
 
 ## 0.2.0 - 2026-10-07
 
@@ -10,11 +10,11 @@ Everything below is relative to 0.1.1.
 
 ### Changed behaviour
 
-- **Breaking: `verify` accepts only `sha256=` followed by exactly 64 hex digits.**
+- Breaking: `verify` accepts only `sha256=` followed by exactly 64 hex digits.
   Before, any run of hex digits passed the shape check and a trailing odd digit
   was silently dropped when decoding, so a 65-character value could verify.
   Upper-case hex is still accepted. An empty secret now returns `false`.
-- **Breaking: `createServer` throws if `secret` is shorter than 16 characters.**
+- Breaking: `createServer` throws if `secret` is shorter than 16 characters.
   A short secret can be guessed offline from one captured signed request.
 - The idempotency key is `sha256("sha256=" + canonical signature hex + raw body)`,
   where the signature is first reduced to 64 lower-case hex digits. Keys for the
@@ -23,7 +23,7 @@ Everything below is relative to 0.1.1.
 - Dedupe is one atomic `SET anvil:dedupe:<key> <token> NX EX <ttl>`. The first
   delivery claims the key and enqueues; later ones return `replayed: true`
   without touching the queue.
-- **Breaking: dedupe has a window.** `dedupeTtlSeconds` defaults to one week.
+- Breaking: dedupe has a window. `dedupeTtlSeconds` defaults to one week.
   Before, a key was remembered for as long as its job stayed in Redis, which was
   forever because jobs were never trimmed. Completed and failed jobs are now
   removed after the same window, and a re-delivery after it is treated as new.
@@ -39,7 +39,7 @@ Everything below is relative to 0.1.1.
   connection is ready, so it recovers on its own.
 - `GET /readyz` is new: `200` only when the queue is usable and Redis answers a
   `PING` within one second, `503` otherwise. `/healthz` is unchanged (liveness).
-- **Breaking: a custom `queueName` dead-letters to `<queueName>.dead`.** Before,
+- Breaking: a custom `queueName` dead-letters to `<queueName>.dead`. Before,
   the worker always wrote to `webhooks.dead` while `replayDeadLetter` read
   `<queueName>.dead`, so a replay could not find the job. Anything reading
   `webhooks.dead` for a custom queue must read the new name. The default queue
