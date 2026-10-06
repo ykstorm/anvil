@@ -189,7 +189,7 @@ provider's signing secret for anything real. It must be at least 16 characters
 
 ## Known limitations
 
-This is 0.1. It is honest about what it is not yet.
+This is a 0.x release. It is honest about what it is not yet.
 
 - No container image is published. Build your own from the Dockerfiles.
 - The idempotency key includes the signature, so an exact re-delivery (same
