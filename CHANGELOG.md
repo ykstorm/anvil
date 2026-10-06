@@ -52,12 +52,12 @@ Everything below is relative to 0.1.1.
   redacted. `replayDeadLetter` drops `originalJobId` along with `failureContext`,
   so a replayed job is a clean first attempt.
 - The retry schedule is documented and exported as 1 s, 5 s, 30 s, then
-  dead-letter after the fourth failure. Job timing is **unchanged**: 0.1.1
+  dead-letter after the fourth failure. Job timing is unchanged: 0.1.1
   listed a 5 minute step, but four attempts have only three waits, so that step
-  was never reached. **Breaking** only for code importing the unstable
+  was never reached. Breaking only for code importing the unstable
   `./internal/*` subpath: `BACKOFF_MS` has three entries and `backoffStrategy`
   is gone (use `backoffDelay`). `MAX_ATTEMPTS` is still 4.
-- **Breaking for TypeScript users: `WebhookJobData` has a required `receivedAt`**
+- Breaking for TypeScript users: `WebhookJobData` has a required `receivedAt`
   (ISO timestamp the server stamped on acceptance), which the handler receives
   next to `body` and `sig`. Jobs already in Redis from 0.1.1 lack it.
 - Requests are bounded: `maxBodyBytes` (default `256kb`, oversized gets `413`),
