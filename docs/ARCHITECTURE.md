@@ -15,10 +15,11 @@ The path of one delivery:
        invalid: 401, nothing queued
 
 3. The server computes the idempotency key, `sha256(signature + raw body)`, and
-   claims it with `SET anvil:dedupe:<key> 1 NX EX <ttl>`.
+   claims it with `SET anvil:dedupe:<key> <token> NX EX <ttl>`.
 
        key claimed: one BullMQ job is added, with the key as its jobId
        key already set: a duplicate, nothing queued, replayed is true
+       add fails after the claim: the claim is released, the answer is 503
 
 4. The server answers 202 with `{ jobId, replayed }`.
 5. The worker receives the job and runs the handler.

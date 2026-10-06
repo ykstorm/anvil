@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { Queue } from "bullmq";
 import IORedis, { type Redis } from "ioredis";
 import { computeIdempotencyKey } from "../src/internal/idempotency.js";
@@ -98,5 +98,20 @@ gated("atomic dedupe (Redis-gated)", () => {
     expect(a.replayed).toBe(false);
     expect(b.replayed).toBe(false);
     expect(a.jobId).not.toBe(b.jobId);
+  });
+
+  it("a failed add gives the claim back, so the retry queues exactly one job", async () => {
+    const body = `{"id":"evt_${nonce()}"}`;
+    const sig = signBody(body);
+    const key = computeIdempotencyKey(sig, Buffer.from(body));
+    const add = vi.spyOn(queue, "add").mockRejectedValueOnce(new Error("add failed"));
+
+    await expect(enqueueWebhook(queue, key, data(body, sig))).rejects.toThrow("add failed");
+    expect(await connection.exists(`anvil:dedupe:${key}`)).toBe(0);
+
+    const retry = await enqueueWebhook(queue, key, data(body, sig));
+    expect(retry.replayed).toBe(false);
+    expect(await queue.getJob(key)).toBeDefined();
+    add.mockRestore();
   });
 });

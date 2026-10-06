@@ -2,11 +2,17 @@
 
 The idempotency key is `sha256(signature_header + raw_payload_bytes)`. On the
 first delivery of a key the server claims it atomically with
-`SET anvil:dedupe:<key> 1 NX EX <ttl>` on Redis and enqueues one BullMQ job
-under that key as the jobId. Every later delivery of the same key finds it
+`SET anvil:dedupe:<key> <token> NX EX <ttl>` on Redis and enqueues one BullMQ
+job under that key as the jobId. Every later delivery of the same key finds it
 already set and returns `replayed: true` without enqueuing again. Because the
 claim is a single atomic operation, two concurrent copies of the same delivery
 still produce exactly one job: one wins the `SET NX`, the other sees it is taken.
+
+The claim and the add are two round trips. If the add fails, the server deletes
+the key (only if it still holds the token this request wrote) and answers 503,
+so the provider's retry claims the key again and enqueues. If Redis is failing
+so badly that the delete fails too, the key stays until its TTL runs out and the
+server logs `could not release dedupe claim`.
 
 The key expires after the TTL (one week by default), which bounds how much Redis
 the dedupe set uses. A re-delivery after the window has passed is treated as new.

@@ -8,7 +8,8 @@ Redis-backed integration assertions run in CI against a `redis:7` service.
 |---|---|---|
 | Constant-time HMAC-SHA256 verify (no length oracle, empty secret rejected) | `packages/sdk/src/internal/verify.ts`, `crypto.timingSafeEqual` with a length guard, no `===` | `packages/sdk/test/verify.test.ts` + `verify.spy.test.ts` |
 | Idempotency key `sha256(signature header + raw body)` | `packages/sdk/src/internal/idempotency.ts` | `packages/sdk/test/idempotency.test.ts` |
-| Atomic dedupe: one job per key, even under concurrency | `packages/sdk/src/internal/enqueue.ts`, `SET key 1 NX EX <ttl>` on the queue's Redis client | `packages/sdk/test/idempotency.test.ts` (incl. a 20-way concurrent case, Redis-gated) |
+| Atomic dedupe: one job per key, even under concurrency | `packages/sdk/src/internal/enqueue.ts`, `SET key <token> NX EX <ttl>` on the queue's Redis client | `packages/sdk/test/idempotency.test.ts` (incl. a 20-way concurrent case, Redis-gated) |
+| A failed add releases the claim, so the provider's retry enqueues | `packages/sdk/src/internal/enqueue.ts`, compare-and-delete of the claim token before rethrowing | `packages/sdk/test/enqueue.test.ts` (stub) + `idempotency.test.ts` (Redis-gated) |
 | One source of truth for the builders (apps are thin CLIs, no copy-paste) | `apps/server/src/index.ts` and `apps/worker/src/index.ts` import `createServer` / `createWorker` from `@ykstormsorg/anvil` | typecheck + `apps/*/test` |
 | Retry backoff `[1s, 5s, 30s]`: three waits, four attempts, then dead-letter | `packages/sdk/src/internal/retry.ts`, `BACKOFF_MS` and `MAX_ATTEMPTS`, wired as the BullMQ `backoffStrategy` and the job `attempts` | `packages/sdk/test/retry.test.ts` |
 | Dead-letter + replay via a separate consumer (a broken handler can't loop); error redacted + truncated; main copy removed | `packages/sdk/src/internal/deadLetter.ts` + `replayDeadLetter` (starts no `Worker`) | `packages/sdk/test/deadLetter.test.ts` |

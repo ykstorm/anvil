@@ -27,10 +27,12 @@ Each of these has a test, and each is the reason a line of code exists.
 
 - **One job per delivery.** The idempotency key is `sha256(signature header +
   raw body)`. The first delivery claims the key with an atomic
-  `SET key 1 NX EX <ttl>` and enqueues one job; later deliveries of the same key
-  find it already set and return `replayed: true` without enqueuing again. Two
-  concurrent copies of the same delivery still yield exactly one job. The key
-  expires after the dedupe TTL (one week by default), which bounds the memory.
+  `SET key <token> NX EX <ttl>` and enqueues one job; later deliveries of the
+  same key find it already set and return `replayed: true` without enqueuing
+  again. Two concurrent copies of the same delivery still yield exactly one job.
+  If adding the job fails after the claim, the claim is released and the server
+  answers 503, so the provider's retry is treated as new. The key expires after
+  the dedupe TTL (one week by default), which bounds the memory.
 - **Constant-time signature check.** `verify(body, sigHeader, secret)` recomputes
   the HMAC-SHA256 over the raw bytes and compares with `crypto.timingSafeEqual`
   after a length check, so the compare never throws and leaks no length oracle.
