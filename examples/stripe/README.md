@@ -21,7 +21,7 @@ REDIS_URL=redis://localhost:6379 \
   node --experimental-strip-types examples/stripe/worker.ts
 
 # server
-WEBHOOK_SECRET=whsec_dev REDIS_URL=redis://localhost:6379 \
+WEBHOOK_SECRET=whsec_dev_only_not_a_real_secret REDIS_URL=redis://localhost:6379 \
   node --experimental-strip-types examples/stripe/server.ts
 ```
 

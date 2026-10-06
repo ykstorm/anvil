@@ -31,7 +31,7 @@ otherwise both fall back to `image.repository`.
 helm install anvil ./charts/anvil \
   --set image.repository=ghcr.io/you/anvil \
   --set image.tag=0.1.0 \
-  --set secret.webhookSecret=whsec_real \
+  --set secret.webhookSecret=whsec_dev_only_not_a_real_secret \
   --set worker.replicas=3 \
   --set server.ingress.host=anvil.example.com
 ```
@@ -60,7 +60,10 @@ See `values.yaml`. Common ones:
 - `worker.replicas`, number of worker pods. Mirror to Terraform `worker_count`.
 - `server.ingress.host` / `server.ingress.path`, webhook ingress address.
 - `secret.create` / `secret.webhookSecret` / `secret.existingSecret`. The chart
-  refuses to render the placeholder `whsec_changeme` or an empty secret.
+  refuses to render the placeholder `whsec_changeme`, an empty secret, or one
+  shorter than 16 characters, which the server would refuse at start. The
+  value in the install example above is public; use your provider's signing
+  secret for anything real.
 - `redis.deploy` / `redis.url`.
 - `redis.password` / `redis.existingSecret` for Redis `requirepass`.
 

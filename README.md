@@ -88,7 +88,7 @@ pnpm -r build
 REDIS_URL=redis://localhost:6379 pnpm --filter @anvil/worker start
 
 # terminal 2: the server
-WEBHOOK_SECRET=whsec_dev_secret_at_least_16 REDIS_URL=redis://localhost:6379 \
+WEBHOOK_SECRET=whsec_dev_only_not_a_real_secret REDIS_URL=redis://localhost:6379 \
   pnpm --filter @anvil/server start
 ```
 
@@ -96,7 +96,7 @@ Send a signed request:
 
 ```bash
 BODY='{"id":"evt_1","type":"charge.succeeded"}'
-SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac whsec_dev_secret_at_least_16 | awk '{print $2}')"
+SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac whsec_dev_only_not_a_real_secret | awk '{print $2}')"
 curl -i -X POST http://localhost:3000/webhooks \
   -H "x-signature: $SIG" \
   -H "content-type: application/json" \
@@ -108,7 +108,10 @@ again and `replayed` is `true` with the same `jobId`; the worker still runs the
 job once.
 
 The secret must be at least 16 characters; `createServer` throws on a shorter
-one. The server also exposes `/healthz` (liveness: the process is up) and
+one. The reason: anyone who captures one signed request can try candidate
+secrets against it offline, as fast as they can compute HMACs, so a short
+secret can be guessed and then used to sign forged webhooks. Provider-generated
+secrets are much longer than the floor. The server also exposes `/healthz` (liveness: the process is up) and
 `/readyz` (readiness: 200 once Redis answers a PING, 503 until then). A server
 started before Redis is reachable answers 503 on `/readyz` and `/webhooks`
 while the client keeps reconnecting, and starts accepting on its own once
@@ -172,8 +175,12 @@ terraform -chdir=infra/terraform init && terraform -chdir=infra/terraform apply
 # Helm
 helm install anvil ./charts/anvil \
   --set image.repository=ghcr.io/you/anvil \
-  --set secret.webhookSecret=whsec_real
+  --set secret.webhookSecret=whsec_dev_only_not_a_real_secret
 ```
+
+The secret above is a placeholder that is public in this repo; pass your
+provider's signing secret for anything real. It must be at least 16 characters
+(the chart refuses to render a shorter one, and the server would not start).
 
 ## Known limitations
 
