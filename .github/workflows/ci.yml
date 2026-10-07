@@ -112,11 +112,18 @@ jobs:
         with: { version: 9 }
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
+          node-version: 22
           registry-url: 'https://registry.npmjs.org'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
-      - run: pnpm --filter @ykstormsorg/anvil publish --access public --no-git-checks --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Trusted publishing needs npm 11.5.1 or newer; the npm bundled with Node 22 is older.
+      # Pinned to the 11.x line so a new major npm cannot change the release job unannounced.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@^11.5.1
+      # npm publishes from the package folder: the pinned pnpm 9 has no documented
+      # trusted publishing support, and the package has no workspace: dependencies.
+      # npm authenticates with the OIDC token, so no NODE_AUTH_TOKEN is set.
+      - name: Publish to npm
+        working-directory: packages/sdk
+        run: npm publish --access public --provenance

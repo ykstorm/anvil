@@ -64,7 +64,7 @@ Install the SDK in your app:
 npm install @ykstormsorg/anvil
 ```
 
-The publish job builds with provenance (`pnpm publish --provenance`). npm does
+The publish job builds with provenance (`npm publish --provenance`). npm does
 not check provenance at install time, so verify it yourself after installing:
 
 ```bash

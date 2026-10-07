@@ -20,6 +20,6 @@ Redis-backed integration assertions run in CI against a `redis:7` service.
 | Small SDK surface, exactly `createServer`, `createWorker`, `replayDeadLetter` | `packages/sdk/src/index.ts` | `packages/sdk/test/sdk.test.ts` |
 | Ships a Terraform module | `infra/terraform/*.tf` | `terraform validate` + `fmt` (infra.yml) |
 | Ships a Helm chart | `charts/anvil/` | `helm lint` + `helm template \| kubeconform` (infra.yml) |
-| Publishes `@ykstormsorg/anvil` with build provenance | tag-gated publish job (`pnpm publish --provenance`) | `.github/workflows/ci.yml` `publish` job. npm does not verify provenance on install; run `npm audit signatures` to check it |
+| Publishes `@ykstormsorg/anvil` with build provenance | tag-gated publish job (`npm publish --provenance`) | `.github/workflows/ci.yml` `publish` job. npm does not verify provenance on install; run `npm audit signatures` to check it |
 | Stripe + GitHub webhook examples | `examples/stripe/*`, `examples/github/*`, workspace packages run with `pnpm --filter @anvil/example-<name> run server` / `run worker` | the "Type-check the examples" step in `.github/workflows/ci.yml`; GitHub's `x-hub-signature-256` is Anvil's native `sha256=<hex>` format |
 | Lint is enforced (not a no-op) | ESLint flat config + `lint` scripts per package | `.github/workflows/ci.yml` runs `pnpm -r lint` on node 20 + 22 |
