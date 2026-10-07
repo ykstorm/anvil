@@ -46,7 +46,7 @@ await worker.start();
 
 Each of these has a test, and each is the reason a line of code exists.
 
-- **One job per delivery.** The idempotency key is `sha256(signature + raw
+- One job per delivery. The idempotency key is `sha256(signature + raw
   body)`, where the signature is first reduced to one canonical form
   (`sha256=` and 64 lower-case hex digits), so different spellings of one valid
   signature cannot make different keys. The first delivery claims the key with
@@ -57,21 +57,21 @@ Each of these has a test, and each is the reason a line of code exists.
   If adding the job fails after the claim, the claim is released and the server
   answers 503, so the provider's retry is treated as new. The key expires after
   the dedupe TTL (one week by default), which bounds the memory.
-- **Constant-time signature check.** `verify(body, sigHeader, secret)` recomputes
+- Constant-time signature check. `verify(body, sigHeader, secret)` recomputes
   the HMAC-SHA256 over the raw bytes and compares with `crypto.timingSafeEqual`
   after a length check, so the compare never throws and leaks no length oracle.
   An empty secret, a malformed header, or a digest that is not exactly 64 hex
   digits is a plain `false`.
-- **Fixed retry backoff.** A failing handler retries after 1s, 5s and 30s;
+- Fixed retry backoff. A failing handler retries after 1s, 5s and 30s;
   after the fourth failure the job moves to the dead-letter queue,
   `<queueName>.dead` (`webhooks.dead` by default), with
   `failureContext: { attempts, lastError }`, where
   `lastError` is truncated and has credential-looking query params redacted.
-- **Replay is a separate consumer.** `replayDeadLetter(jobId)` moves a dead job
+- Replay is a separate consumer. `replayDeadLetter(jobId)` moves a dead job
   back to the main queue with a fresh retry schedule and returns
   `{ replayed: true }`. The replay path starts no worker on the main queue, so
   importing it cannot kick off a retry loop.
-- **Small SDK surface.** `@ykstormsorg/anvil` exports exactly `createServer`,
+- Small SDK surface. `@ykstormsorg/anvil` exports exactly `createServer`,
   `createWorker`, and `replayDeadLetter`.
 
 A provider that rotates the signature on re-delivery produces a different key,
@@ -81,7 +81,7 @@ so that case is not deduped; see the
 ## API
 
 ### `createServer(options) to Express app`
-Verifies the `sha256=<hex>` HMAC over the **raw** request body with a
+Verifies the `sha256=<hex>` HMAC over the raw request body with a
 constant-time compare, computes the idempotency key, enqueues to BullMQ, and
 returns `202`. A duplicate returns the original job's id without enqueuing again.
 It answers `401` for a bad signature, `413` for an oversized body, `429` when
