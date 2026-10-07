@@ -191,6 +191,12 @@ provider's signing secret for anything real. It must be at least 16 characters
 
 This is a 0.x release. It is honest about what it is not yet.
 
+- The per-IP rate limit is off unless you pass `rateLimit` to `createServer`, and
+  `apps/server` does not pass it. A server reachable from the public internet
+  must set it, or be limited at the load balancer or Ingress. It counts by the
+  connection's address, in memory, per process, so behind a proxy every caller
+  shares the proxy's address unless you call `app.set("trust proxy", n)` on the
+  app `createServer` returns.
 - No container image is published. Build your own from the Dockerfiles.
 - The idempotency key includes the signature, so an exact re-delivery (same
   signature and body) dedupes, but a provider that rotates the signature on
