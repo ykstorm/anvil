@@ -98,7 +98,7 @@ until then).
 | `maxBodyBytes` | `256kb` | largest accepted body, `413` above it |
 | `maxInFlight` | `1000` | requests handled at once, `429` above it |
 | `dedupeTtlSeconds` | one week | how long a seen delivery is remembered |
-| `rateLimit` | off | `{ windowMs, max }` per-IP fixed window |
+| `rateLimit` | off | `{ windowMs, max }` per-IP fixed window; set it for a public deployment (see Known limitations) |
 
 ### `createWorker(handler, options?) to { start, close }`
 Runs `handler({ body, sig, receivedAt }, job)`. On a thrown error it retries after 1s, 5s
@@ -112,6 +112,7 @@ gated admin path, not inside the worker.
 
 ## Known limitations
 
+- `rateLimit` is off unless you set it. A server reachable from the public internet must set it, or be limited at the load balancer or Ingress. It counts by the connection's address, in memory, per process, so behind a proxy every caller shares the proxy's address unless you call `app.set("trust proxy", n)` on the app `createServer` returns.
 - You map the provider signature header yourself (`signatureHeader`); there is no per-provider preset yet.
 - The secret must be at least 16 characters; `createServer` throws on a shorter one.
 - Replay is one job at a time, no batch mode.
