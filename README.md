@@ -129,7 +129,7 @@ docker compose up --build
 ```
 
 The server listens on `:3000`. Both app images are multi-stage
-`node:20-alpine` builds that run as a non-root user; see
+`node:26-alpine` builds that run as a non-root user; see
 [apps/server/Dockerfile](./apps/server/Dockerfile) and
 [apps/worker/Dockerfile](./apps/worker/Dockerfile). The project does not publish
 a prebuilt image; build your own from these Dockerfiles.
