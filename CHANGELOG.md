@@ -4,6 +4,13 @@ All notable changes to `@ykstormsorg/anvil`. Dates are UTC; 0.1.0 and 0.1.1 are
 the days npm published them. Anvil is 0.x, so a minor version can break things;
 items that can break an existing install are marked Breaking.
 
+## 0.2.1 - 2026-10-08
+
+Docs only. The text that ships with the package was made plain: the README no
+longer uses bold markers. It also now says that `rateLimit` is off unless you
+set it, and what to do about that on a public deployment. Nothing in the code
+changed.
+
 ## 0.2.0 - 2026-10-07
 
 Everything below is relative to 0.1.1.
