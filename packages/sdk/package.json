@@ -54,8 +54,8 @@
     "lint": "eslint src test"
   },
   "dependencies": {
-    "bullmq": "^5.34.5",
-    "express": "^4.21.2",
+    "bullmq": "^5.81.5",
+    "express": "^4.22.3",
     "ioredis": "^5.4.2"
   },
   "devDependencies": {
