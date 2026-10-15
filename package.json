@@ -20,7 +20,7 @@
     "autocannon": "^8.0.0",
     "eslint": "^9",
     "typescript": "^5.6.3",
-    "typescript-eslint": "^8",
+    "typescript-eslint": "^8.71.1",
     "vite": "^6.4.3",
     "vitest": "^4.1.11"
   },
