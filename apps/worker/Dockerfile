@@ -6,7 +6,7 @@
 
 # ---- build: install the workspace, build SDK + worker, then produce a
 #      self-contained production tree via `pnpm deploy`.
-FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS build
+FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS build
 WORKDIR /repo
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
@@ -23,7 +23,7 @@ RUN pnpm --filter @ykstormsorg/anvil --filter @anvil/worker build
 RUN pnpm --filter @anvil/worker deploy --prod /app
 
 # ---- runtime: minimal, non-root. No port; the worker only talks to Redis.
-FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS runtime
+FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build --chown=node:node /app ./
