@@ -6,7 +6,7 @@
 
 # ---- build: install the workspace, build SDK + server, then produce a
 #      self-contained production tree via `pnpm deploy`.
-FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS build
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS build
 WORKDIR /repo
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
@@ -23,7 +23,7 @@ RUN pnpm --filter @ykstormsorg/anvil --filter @anvil/server build
 RUN pnpm --filter @anvil/server deploy --prod /app
 
 # ---- runtime: minimal, non-root.
-FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS runtime
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build --chown=node:node /app ./
